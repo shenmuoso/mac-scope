@@ -7,7 +7,8 @@ struct MenuBarDashboardView: View {
   @EnvironmentObject private var metrics: SystemMetricsStore
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
-  @Environment(\.openWindow) private var openWindow
+
+  let openMainWindow: () -> Void
 
   var body: some View {
     VStack(spacing: 0) {
@@ -113,7 +114,7 @@ struct MenuBarDashboardView: View {
 
   private var footer: some View {
     HStack(spacing: 8) {
-      Button(action: { openMainWindow() }) {
+      Button(action: openMainWindow) {
         Label("Open MacScope", systemImage: "macwindow")
       }
       .buttonStyle(.borderless)
@@ -149,14 +150,6 @@ struct MenuBarDashboardView: View {
 
   private func updateProcessSampling() {
     monitor.setProcessSampling(settings.menuBarModules.contains(.processes), for: .menuBar)
-  }
-
-  private func openMainWindow() {
-    openWindow(id: "main")
-    DispatchQueue.main.async {
-      AppWindowActions.activate()
-      AppWindowActions.mainWindow?.makeKeyAndOrderFront(nil)
-    }
   }
 
   private func openProcess(_ process: ProcessRow) {
