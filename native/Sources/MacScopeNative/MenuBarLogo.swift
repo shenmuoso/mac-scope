@@ -125,6 +125,10 @@ struct MenuBarStatusContent: View {
         snapshot.cpu.temperature.socCelsius,
         unit: temperatureUnit
       ) ?? "--°"
+    case .systemPower:
+      return "PWR \(DisplayFormat.compactPower(snapshot.power.systemWatts))"
+    case .chargingPower:
+      return "CHG \(DisplayFormat.compactPower(snapshot.power.chargingWatts))"
     }
   }
 

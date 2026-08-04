@@ -390,9 +390,14 @@ struct BatteryHealthView: View {
             value: DisplayFormat.duration(TimeInterval(minutes * 60))
           )
         }
-        if let watts = battery.powerWatts {
-          batteryRow("Power", value: String(format: "%+.1f W", watts))
-        }
+        batteryRow(
+          "System Power",
+          value: DisplayFormat.power(battery.systemPowerWatts) ?? "--"
+        )
+        batteryRow(
+          "Charging Power",
+          value: DisplayFormat.power(battery.chargingPowerWatts) ?? "--"
+        )
       }
 
       Section("Health") {

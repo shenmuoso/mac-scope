@@ -297,9 +297,43 @@ private struct MenuBarMetricRow: View {
         progress: nil,
         progressColor: .clear
       )
+    case .systemPower:
+      return MetricPresentation(
+        value: DisplayFormat.power(snapshot.power.systemWatts) ?? "--",
+        detail: systemPowerDetail(snapshot.power),
+        accentColor: accent(.orange),
+        valueColor: .primary,
+        progress: nil,
+        progressColor: .clear
+      )
+    case .chargingPower:
+      return MetricPresentation(
+        value: DisplayFormat.power(snapshot.power.chargingWatts) ?? "--",
+        detail: chargingPowerDetail(snapshot.power),
+        accentColor: accent(.green),
+        valueColor: .primary,
+        progress: nil,
+        progressColor: .clear
+      )
     case .processes:
       preconditionFailure("Processes use a dedicated module view")
     }
+  }
+
+  private func systemPowerDetail(_ power: PowerUsage) -> String {
+    guard power.systemWatts != nil else { return localized("Power Telemetry Unavailable") }
+    switch power.isExternalPowerConnected {
+    case true: return localized("Connected to Power")
+    case false: return localized("Using Battery")
+    case nil: return localized("Live System Load")
+    }
+  }
+
+  private func chargingPowerDetail(_ power: PowerUsage) -> String {
+    guard power.hasBattery else { return localized("No Built-in Battery") }
+    if power.isCharging { return localized("Charging") }
+    if power.isExternalPowerConnected == true { return localized("Not Charging") }
+    return localized("Using Battery")
   }
 
   private func temperatureStatus(_ status: ThermalStatus) -> String {
@@ -377,6 +411,10 @@ private struct MetricSparkline: View {
         value = point.networkDownloadRate + point.networkUploadRate
       case .temperature:
         value = point.temperatureCelsius
+      case .systemPower:
+        value = point.systemPowerWatts
+      case .chargingPower:
+        value = point.chargingPowerWatts
       case .processes:
         value = nil
       }
@@ -389,6 +427,8 @@ private struct MetricSparkline: View {
     case .cpu, .memory:
       return 0...100
     case .disk, .network:
+      return 0...max(1, (points.map(\.value).max() ?? 0) * 1.12)
+    case .systemPower, .chargingPower:
       return 0...max(1, (points.map(\.value).max() ?? 0) * 1.12)
     case .temperature:
       let values = points.map(\.value)

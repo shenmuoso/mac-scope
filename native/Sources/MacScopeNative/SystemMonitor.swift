@@ -21,7 +21,9 @@ final class SystemMetricsStore: ObservableObject {
         diskWriteRate: metrics.disk.writeRate,
         networkDownloadRate: metrics.network.downloadRate,
         networkUploadRate: metrics.network.uploadRate,
-        temperatureCelsius: metrics.cpu.temperature.socCelsius
+        temperatureCelsius: metrics.cpu.temperature.socCelsius,
+        systemPowerWatts: metrics.power.systemWatts,
+        chargingPowerWatts: metrics.power.chargingWatts
       )
     )
     snapshot = metrics
