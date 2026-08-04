@@ -32,6 +32,31 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     }
   }
 
+  var pageDescription: LocalizedStringKey {
+    switch self {
+    case .overview:
+      "Live CPU, memory, disk, network, and process activity."
+    case .systemInfo:
+      "Hardware, storage, displays, and connected devices on this Mac."
+    case .battery:
+      "Charge, capacity, cycle count, temperature, and power activity."
+    case .ports:
+      "Listening ports and the processes and software using them."
+    case .downloads:
+      "Installers, archives, and older files in your Downloads folder."
+    case .junk:
+      "Caches, logs, diagnostics, and developer data."
+    case .applications:
+      "Installed applications and their related data."
+    case .largeFiles:
+      "Files above the size threshold in your selected folders."
+    case .duplicates:
+      "Byte-for-byte matches in your selected folders."
+    case .memory:
+      "Current memory pressure and inactive file cache."
+    }
+  }
+
   var systemImage: String {
     switch self {
     case .overview: "gauge.with.dots.needle.50percent"

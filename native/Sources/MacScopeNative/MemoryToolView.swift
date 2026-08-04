@@ -9,16 +9,7 @@ struct MemoryToolView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolHeader(
-        "Memory",
-        subtitle: "Current memory pressure and inactive file cache."
-      ) {
-        Button(action: { store.releaseMemory() }) {
-          Label("Release Memory", systemImage: "memorychip")
-        }
-        .disabled(store.isBusy)
-      }
-      Divider()
+      SystemToolPageHeader(destination: .memory)
 
       if store.activity?.tool == .memory {
         MaintenanceActivityInlineView(tool: .memory)
@@ -48,7 +39,15 @@ struct MemoryToolView: View {
       }
       .compactNativeScrollers()
     }
-    .navigationTitle(AppLocalization.string("Memory", language: settings.language))
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button(action: { store.releaseMemory() }) {
+          Label("Release Memory", systemImage: "memorychip")
+        }
+        .help("Release Memory")
+        .disabled(store.isBusy)
+      }
+    }
   }
 
   private var memoryGauge: some View {

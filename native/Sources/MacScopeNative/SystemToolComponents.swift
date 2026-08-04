@@ -14,38 +14,52 @@ enum WorkspaceIconCache {
   }
 }
 
-struct SystemToolHeader<Actions: View>: View {
-  let title: LocalizedStringKey
-  let subtitle: LocalizedStringKey
-  @ViewBuilder let actions: Actions
-
-  init(
-    _ title: LocalizedStringKey,
-    subtitle: LocalizedStringKey,
-    @ViewBuilder actions: () -> Actions
-  ) {
-    self.title = title
-    self.subtitle = subtitle
-    self.actions = actions()
-  }
+struct SystemToolPageHeader: View {
+  let destination: AppDestination
 
   var body: some View {
-    HStack(alignment: .center, spacing: 20) {
-      VStack(alignment: .leading, spacing: 3) {
-        Text(title)
-          .font(.headline)
-        Text(subtitle)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+    VStack(spacing: 8) {
+      ZStack {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .fill(destination.iconColor.gradient)
+          .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+              .stroke(.white.opacity(0.18), lineWidth: 0.5)
+          }
+
+        Image(systemName: destination.systemImage)
+          .symbolRenderingMode(.monochrome)
+          .font(.system(size: 27, weight: .medium))
+          .foregroundStyle(.white)
       }
-      Spacer(minLength: 20)
-      HStack(spacing: 8) {
-        actions
-      }
+      .frame(width: 56, height: 56)
+      .shadow(color: .black.opacity(0.16), radius: 2, y: 1)
+
+      Text(destination.title)
+        .font(.title2.weight(.semibold))
+
+      Text(destination.pageDescription)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .lineLimit(2)
+        .frame(maxWidth: 560)
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 10)
-    .background(.bar)
+    .frame(maxWidth: .infinity, minHeight: 116)
+    .padding(.horizontal, 28)
+    .padding(.vertical, 16)
+    .background(Color(nsColor: .controlBackgroundColor))
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+    }
+    .frame(maxWidth: 880)
+    .frame(maxWidth: .infinity)
+    .padding(.horizontal, 24)
+    .padding(.top, 16)
+    .padding(.bottom, 14)
+    .accessibilityElement(children: .combine)
   }
 }
 

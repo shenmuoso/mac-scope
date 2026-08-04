@@ -1,4 +1,5 @@
 import AppKit
+import Charts
 import SwiftUI
 
 struct HardwareInfoView: View {
@@ -6,27 +7,30 @@ struct HardwareInfoView: View {
   @StateObject private var store = HardwareInfoStore()
 
   var body: some View {
-    Group {
-      if let snapshot = store.snapshot {
-        hardwareList(snapshot)
-      } else if store.isLoading {
-        ProgressView("Loading System Information")
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-      } else if !store.errorMessage.isEmpty {
-        SystemToolEmptyView(
-          systemImage: "exclamationmark.triangle",
-          title: "System Information Unavailable",
-          message: "MacScope could not read the current hardware information."
-        ) {
-          Button("Try Again", action: store.refresh)
-            .buttonStyle(.borderedProminent)
+    VStack(spacing: 0) {
+      HardwareDeviceHeader(snapshot: store.snapshot)
+
+      Group {
+        if let snapshot = store.snapshot {
+          hardwareList(snapshot)
+        } else if store.isLoading {
+          ProgressView("Loading System Information")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if !store.errorMessage.isEmpty {
+          SystemToolEmptyView(
+            systemImage: "exclamationmark.triangle",
+            title: "System Information Unavailable",
+            message: "MacScope could not read the current hardware information."
+          ) {
+            Button("Try Again", action: store.refresh)
+              .buttonStyle(.borderedProminent)
+          }
+        } else {
+          ProgressView("Loading System Information")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-      } else {
-        ProgressView("Loading System Information")
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .navigationTitle("System Information")
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
         Button(action: copySummary) {
@@ -51,25 +55,6 @@ struct HardwareInfoView: View {
 
   private func hardwareList(_ snapshot: HardwareSnapshot) -> some View {
     Form {
-      Section {
-        HStack(spacing: 16) {
-          Image(systemName: "desktopcomputer")
-            .font(.system(size: 32, weight: .medium))
-            .foregroundStyle(.tint)
-            .frame(width: 44)
-
-          VStack(alignment: .leading, spacing: 3) {
-            Text(snapshot.machineName)
-              .font(.headline)
-            Text("\(snapshot.chipName) · \(DisplayFormat.bytes(snapshot.memoryBytes))")
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-          }
-          Spacer(minLength: 0)
-        }
-        .padding(.vertical, 6)
-      }
-
       Section("Mac") {
         infoRow("Model", value: snapshot.machineName, systemImage: "laptopcomputer")
         infoRow("Model Identifier", value: snapshot.modelIdentifier, systemImage: "number")
@@ -333,28 +318,89 @@ struct HardwareInfoView: View {
   }
 }
 
+private struct HardwareDeviceHeader: View {
+  let snapshot: HardwareSnapshot?
+
+  var body: some View {
+    VStack(spacing: 6) {
+      if let computerImage = NSImage(named: NSImage.computerName) {
+        Image(nsImage: computerImage)
+          .resizable()
+          .aspectRatio(contentMode: .fit)
+          .frame(width: 210, height: 132)
+          .accessibilityHidden(true)
+      } else {
+        Image(systemName: AppDestination.systemInfo.systemImage)
+          .font(.system(size: 52, weight: .light))
+          .foregroundStyle(.secondary)
+          .frame(width: 210, height: 132)
+          .accessibilityHidden(true)
+      }
+
+      Group {
+        if let snapshot {
+          Text(snapshot.machineName)
+        } else {
+          Text(AppDestination.systemInfo.title)
+        }
+      }
+      .font(.title2.weight(.semibold))
+
+      if let snapshot {
+        Text("\(snapshot.chipName) · \(DisplayFormat.bytes(snapshot.memoryBytes))")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .monospacedDigit()
+      } else {
+        Text(AppDestination.systemInfo.pageDescription)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 190)
+    .padding(.horizontal, 28)
+    .padding(.vertical, 14)
+    .background(Color(nsColor: .controlBackgroundColor))
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+    }
+    .frame(maxWidth: 880)
+    .frame(maxWidth: .infinity)
+    .padding(.horizontal, 24)
+    .padding(.top, 16)
+    .padding(.bottom, 14)
+    .accessibilityElement(children: .combine)
+  }
+}
+
 struct BatteryHealthView: View {
   @EnvironmentObject private var settings: AppSettings
+  @EnvironmentObject private var metrics: SystemMetricsStore
   @StateObject private var store = BatteryInfoStore()
 
   var body: some View {
-    Group {
-      if let battery = store.snapshot {
-        batteryList(battery)
-      } else if store.isLoading || !store.hasLoaded {
-        ProgressView("Reading Battery Information")
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-      } else {
-        SystemToolEmptyView(
-          systemImage: "battery.0percent",
-          title: "No Built-in Battery",
-          message: "This Mac does not report a built-in battery."
-        ) {
-          Button("Refresh", action: store.refresh)
+    VStack(spacing: 0) {
+      SystemToolPageHeader(destination: .battery)
+
+      Group {
+        if let battery = store.snapshot {
+          batteryDashboard(battery)
+        } else if store.isLoading || !store.hasLoaded {
+          ProgressView("Reading Battery Information")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+          SystemToolEmptyView(
+            systemImage: "battery.0percent",
+            title: "No Built-in Battery",
+            message: "This Mac does not report a built-in battery."
+          ) {
+            Button("Refresh", action: store.refresh)
+          }
         }
       }
     }
-    .navigationTitle("Battery Health")
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button(action: store.refresh) {
@@ -364,113 +410,277 @@ struct BatteryHealthView: View {
         .disabled(store.isLoading)
       }
     }
-    .onAppear(perform: store.refresh)
+    .onAppear(perform: store.startMonitoring)
+    .onDisappear(perform: store.stopMonitoring)
   }
 
-  private func batteryList(_ battery: BatterySnapshot) -> some View {
-    Form {
-      Section("Current Charge") {
-        VStack(alignment: .leading, spacing: 8) {
-          HStack {
-            Label(chargeStatus(battery), systemImage: batterySymbol(battery))
-            Spacer()
-            Text(DisplayFormat.compactPercent(battery.chargePercent))
-              .font(.headline)
-              .monospacedDigit()
-          }
-          ProgressView(value: battery.chargePercent, total: 100)
-            .tint(chargeColor(battery.chargePercent))
-        }
-        .padding(.vertical, 4)
+  private func batteryDashboard(_ battery: BatterySnapshot) -> some View {
+    ScrollView {
+      VStack(spacing: 16) {
+        LazyVGrid(
+          columns: [GridItem(.adaptive(minimum: 190, maximum: 260), spacing: 16)],
+          spacing: 16
+        ) {
+          BatteryMetricGauge(
+            title: "Current Charge",
+            systemImage: batterySymbol(battery),
+            value: battery.chargePercent / 100,
+            valueText: DisplayFormat.compactPercent(battery.chargePercent),
+            detail: chargeStatus(battery),
+            tint: chargeColor(battery.chargePercent)
+          )
 
-        batteryRow("Power Source", value: battery.isExternalPowerConnected ? "Power Adapter" : "Battery")
-        if let minutes = battery.timeRemainingMinutes {
-          batteryRow(
-            battery.isCharging ? "Time to Full" : "Time Remaining",
-            value: DisplayFormat.duration(TimeInterval(minutes * 60))
+          BatteryMetricGauge(
+            title: "Maximum Capacity",
+            systemImage: "heart.text.square",
+            value: battery.healthPercent.map { $0 / 100 },
+            valueText: battery.healthPercent.map(DisplayFormat.compactPercent) ?? "--",
+            detail: conditionTitle(battery.condition),
+            tint: battery.healthPercent.map(healthColor) ?? .secondary
+          )
+
+          BatteryMetricGauge(
+            title: "Cycle Count",
+            systemImage: "arrow.triangle.2.circlepath",
+            value: cycleProgress(battery),
+            valueText: String(battery.cycleCount),
+            detail: cycleSummary(battery),
+            tint: cycleColor(battery)
           )
         }
-        batteryRow(
-          "System Power",
-          value: DisplayFormat.power(battery.systemPowerWatts) ?? "--"
-        )
-        batteryRow(
-          "Charging Power",
-          value: DisplayFormat.power(battery.chargingPowerWatts) ?? "--"
-        )
-      }
 
-      Section("Health") {
-        if let health = battery.healthPercent {
-          VStack(alignment: .leading, spacing: 8) {
-            HStack {
-              Text("Maximum Capacity")
-              Spacer()
-              Text(DisplayFormat.compactPercent(health))
-                .monospacedDigit()
-            }
-            ProgressView(value: health, total: 100)
-              .tint(healthColor(health))
-          }
-          .padding(.vertical, 4)
-        }
-        batteryRow("Condition", value: conditionTitle(battery.condition))
-        batteryRow("Cycle Count", value: cycleSummary(battery))
-      }
+        powerPanel(battery)
 
-      Section("Capacity") {
-        if let value = battery.designCapacityMAh {
-          batteryRow("Design Capacity", value: "\(value) mAh")
+        if !capacityItems(battery).isEmpty {
+          capacityPanel(battery)
         }
-        if let value = battery.fullChargeCapacityMAh {
-          batteryRow("Full Charge Capacity", value: "\(value) mAh")
-        }
-        if let value = battery.remainingCapacityMAh {
-          batteryRow("Remaining Capacity", value: "\(value) mAh")
-        }
-      }
 
-      Section("Electrical") {
-        if let value = battery.voltageMillivolts {
-          batteryRow("Voltage", value: String(format: "%.2f V", Double(value) / 1_000))
-        }
-        if let value = battery.amperageMilliamps {
-          batteryRow("Current", value: "\(value) mA")
-        }
-        if let value = battery.temperatureCelsius,
-          let formatted = DisplayFormat.temperature(value, unit: settings.temperatureUnit)
-        {
-          batteryRow("Temperature", value: formatted)
+        HStack(alignment: .top, spacing: 16) {
+          statusPanel(battery)
+          electricalPanel(battery)
         }
       }
+      .frame(maxWidth: 900)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 24)
+      .padding(.bottom, 28)
     }
-    .formStyle(.grouped)
-    .frame(maxWidth: 760)
-    .frame(maxWidth: .infinity)
-    .background(Color(nsColor: .windowBackgroundColor))
     .compactNativeScrollers()
   }
 
-  private func batteryRow(_ title: LocalizedStringKey, value: String) -> some View {
-    LabeledContent(title) {
-      Text(value)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
+  private func powerPanel(_ battery: BatterySnapshot) -> some View {
+    BatteryPanel(title: "Recent Power Activity") {
+      HStack(spacing: 28) {
+        BatteryPowerReading(
+          title: "System Power",
+          value: DisplayFormat.power(currentSystemPower(battery)) ?? "--",
+          color: .blue
+        )
+        BatteryPowerReading(
+          title: "Charging Power",
+          value: DisplayFormat.power(currentChargingPower(battery)) ?? "--",
+          color: .green
+        )
+        Spacer(minLength: 0)
+        Text("Last 60 Seconds")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
+      if powerPoints.count > 2 {
+        Chart(powerPoints) { point in
+          LineMark(
+            x: .value("Time", point.timestamp),
+            y: .value("Power", point.watts),
+            series: .value("Series", point.series.rawValue)
+          )
+          .foregroundStyle(point.series.color)
+          .interpolationMethod(.catmullRom)
+          .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis {
+          AxisMarks(position: .leading) {
+            AxisGridLine()
+              .foregroundStyle(Color.secondary.opacity(0.18))
+            AxisValueLabel()
+          }
+        }
+        .chartYScale(domain: powerDomain)
+        .frame(height: 180)
+        .transaction { transaction in
+          transaction.animation = nil
+        }
+
+        HStack {
+          Text("60 Seconds Ago")
+          Spacer()
+          Text("Now")
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+      } else {
+        VStack(spacing: 8) {
+          ProgressView()
+            .controlSize(.small)
+          Text("Collecting Power Activity")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 180)
+      }
     }
   }
 
-  private func batteryRow(_ title: LocalizedStringKey, value: LocalizedStringKey) -> some View {
-    LabeledContent(title) {
-      Text(value)
-        .foregroundStyle(.secondary)
+  private func capacityPanel(_ battery: BatterySnapshot) -> some View {
+    let items = capacityItems(battery)
+    let maximum = Double(items.map(\.value).max() ?? 1) * 1.28
+
+    return BatteryPanel(title: "Capacity Comparison") {
+      Chart(items) { item in
+        BarMark(
+          x: .value("Capacity", item.value),
+          y: .value("Type", localized(item.titleKey))
+        )
+        .foregroundStyle(item.color)
+        .annotation(position: .trailing, alignment: .leading) {
+          Text("\(item.value) mAh")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+        }
+      }
+      .chartXAxis(.hidden)
+      .chartXScale(domain: 0...maximum)
+      .frame(height: CGFloat(items.count * 44 + 12))
     }
   }
 
-  private func chargeStatus(_ battery: BatterySnapshot) -> LocalizedStringKey {
-    if battery.isFullyCharged { return "Fully Charged" }
-    if battery.isCharging { return "Charging" }
-    if battery.isExternalPowerConnected { return "Connected to Power" }
-    return "Using Battery"
+  private func statusPanel(_ battery: BatterySnapshot) -> some View {
+    BatteryPanel(title: "Battery Status") {
+      VStack(spacing: 0) {
+        BatteryDetailRow(
+          title: "Power Source",
+          systemImage: "powerplug",
+          value: localized(battery.isExternalPowerConnected ? "Power Adapter" : "Battery")
+        )
+        if let minutes = battery.timeRemainingMinutes {
+          Divider()
+          BatteryDetailRow(
+            title: battery.isCharging ? "Time to Full" : "Time Remaining",
+            systemImage: "clock",
+            value: DisplayFormat.duration(TimeInterval(minutes * 60))
+          )
+        }
+        Divider()
+        BatteryDetailRow(
+          title: "Condition",
+          systemImage: "heart",
+          value: conditionTitle(battery.condition)
+        )
+        Divider()
+        BatteryDetailRow(
+          title: "Temperature",
+          systemImage: "thermometer.medium",
+          value: batteryTemperature(battery)
+        )
+      }
+    }
+  }
+
+  private func electricalPanel(_ battery: BatterySnapshot) -> some View {
+    BatteryPanel(title: "Electrical") {
+      VStack(spacing: 0) {
+        BatteryDetailRow(
+          title: "Voltage",
+          systemImage: "bolt",
+          value: battery.voltageMillivolts.map {
+            String(format: "%.2f V", Double($0) / 1_000)
+          } ?? "--"
+        )
+        Divider()
+        BatteryDetailRow(
+          title: "Current",
+          systemImage: "waveform.path",
+          value: battery.amperageMilliamps.map { "\($0) mA" } ?? "--"
+        )
+        Divider()
+        BatteryDetailRow(
+          title: "System Power",
+          systemImage: "gauge.with.dots.needle.50percent",
+          value: DisplayFormat.power(currentSystemPower(battery)) ?? "--"
+        )
+        Divider()
+        BatteryDetailRow(
+          title: "Charging Power",
+          systemImage: "battery.100percent.bolt",
+          value: DisplayFormat.power(currentChargingPower(battery)) ?? "--"
+        )
+      }
+    }
+  }
+
+  private var powerPoints: [BatteryPowerPoint] {
+    metrics.history.flatMap { point in
+      var values: [BatteryPowerPoint] = []
+      if let watts = point.systemPowerWatts {
+        values.append(
+          BatteryPowerPoint(timestamp: point.timestamp, watts: watts, series: .system)
+        )
+      }
+      if let watts = point.chargingPowerWatts {
+        values.append(
+          BatteryPowerPoint(timestamp: point.timestamp, watts: watts, series: .charging)
+        )
+      }
+      return values
+    }
+  }
+
+  private var powerDomain: ClosedRange<Double> {
+    0...max(1, (powerPoints.map(\.watts).max() ?? 0) * 1.15)
+  }
+
+  private func capacityItems(_ battery: BatterySnapshot) -> [BatteryCapacityItem] {
+    [
+      battery.designCapacityMAh.map {
+        BatteryCapacityItem(
+          titleKey: "Design Capacity",
+          value: $0,
+          color: .secondary.opacity(0.55)
+        )
+      },
+      battery.fullChargeCapacityMAh.map {
+        BatteryCapacityItem(
+          titleKey: "Full Charge Capacity",
+          value: $0,
+          color: .green.opacity(0.72)
+        )
+      },
+      battery.remainingCapacityMAh.map {
+        BatteryCapacityItem(titleKey: "Remaining Capacity", value: $0, color: .green)
+      },
+    ].compactMap { $0 }
+  }
+
+  private func currentSystemPower(_ battery: BatterySnapshot) -> Double? {
+    metrics.snapshot.power.systemWatts ?? battery.systemPowerWatts
+  }
+
+  private func currentChargingPower(_ battery: BatterySnapshot) -> Double? {
+    metrics.snapshot.power.chargingWatts ?? battery.chargingPowerWatts
+  }
+
+  private func batteryTemperature(_ battery: BatterySnapshot) -> String {
+    let temperature = battery.temperatureCelsius ?? metrics.snapshot.cpu.temperature.batteryCelsius
+    return DisplayFormat.temperature(temperature, unit: settings.temperatureUnit) ?? "--"
+  }
+
+  private func chargeStatus(_ battery: BatterySnapshot) -> String {
+    if battery.isFullyCharged { return localized("Fully Charged") }
+    if battery.isCharging { return localized("Charging") }
+    if battery.isExternalPowerConnected { return localized("Connected to Power") }
+    return localized("Using Battery")
   }
 
   private func batterySymbol(_ battery: BatterySnapshot) -> String {
@@ -491,16 +701,163 @@ struct BatteryHealthView: View {
     percent < 70 ? .red : (percent < 80 ? .orange : .green)
   }
 
-  private func conditionTitle(_ condition: BatteryCondition) -> LocalizedStringKey {
+  private func conditionTitle(_ condition: BatteryCondition) -> String {
     switch condition {
-    case .normal: "Normal"
-    case .serviceRecommended: "Service Recommended"
-    case .unknown: "Unavailable"
+    case .normal: localized("Normal")
+    case .serviceRecommended: localized("Service Recommended")
+    case .unknown: localized("Unavailable")
     }
+  }
+
+  private func cycleProgress(_ battery: BatterySnapshot) -> Double? {
+    guard let limit = battery.cycleLimit, limit > 0 else { return nil }
+    return Double(battery.cycleCount) / Double(limit)
+  }
+
+  private func cycleColor(_ battery: BatterySnapshot) -> Color {
+    guard let progress = cycleProgress(battery) else { return .secondary }
+    if progress >= 0.9 { return .red }
+    if progress >= 0.75 { return .orange }
+    return .green
   }
 
   private func cycleSummary(_ battery: BatterySnapshot) -> String {
     guard let limit = battery.cycleLimit, limit > 0 else { return String(battery.cycleCount) }
     return "\(battery.cycleCount) / \(limit)"
+  }
+
+  private func localized(_ key: String) -> String {
+    AppLocalization.string(key, language: settings.language)
+  }
+}
+
+private struct BatteryMetricGauge: View {
+  let title: LocalizedStringKey
+  let systemImage: String
+  let value: Double?
+  let valueText: String
+  let detail: String
+  let tint: Color
+
+  var body: some View {
+    VStack(spacing: 10) {
+      Gauge(value: min(1, max(0, value ?? 0))) {
+        Label(title, systemImage: systemImage)
+      } currentValueLabel: {
+        Text(valueText)
+          .font(.headline)
+          .monospacedDigit()
+      }
+      .gaugeStyle(.accessoryCircularCapacity)
+      .tint(value == nil ? .secondary : tint)
+      .controlSize(.large)
+      .scaleEffect(1.18)
+      .frame(width: 112, height: 102)
+
+      Text(title)
+        .font(.subheadline.weight(.semibold))
+      Text(detail)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+    }
+    .frame(maxWidth: .infinity, minHeight: 160)
+    .padding(14)
+    .background(Color(nsColor: .controlBackgroundColor))
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+  }
+}
+
+private struct BatteryPanel<Content: View>: View {
+  let title: LocalizedStringKey
+  @ViewBuilder let content: Content
+
+  init(title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
+    self.title = title
+    self.content = content()
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text(title)
+        .font(.headline)
+      content
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(18)
+    .background(Color(nsColor: .controlBackgroundColor))
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+  }
+}
+
+private struct BatteryPowerReading: View {
+  let title: LocalizedStringKey
+  let value: String
+  let color: Color
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Circle()
+        .fill(color)
+        .frame(width: 7, height: 7)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text(value)
+          .font(.title3.weight(.semibold))
+          .monospacedDigit()
+      }
+    }
+  }
+}
+
+private struct BatteryDetailRow: View {
+  let title: LocalizedStringKey
+  let systemImage: String
+  let value: String
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Label(title, systemImage: systemImage)
+      Spacer(minLength: 12)
+      Text(value)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+    }
+    .frame(minHeight: 36)
+  }
+}
+
+private struct BatteryCapacityItem: Identifiable {
+  let titleKey: String
+  let value: Int
+  let color: Color
+
+  var id: String { titleKey }
+}
+
+private struct BatteryPowerPoint: Identifiable {
+  enum Series: String {
+    case system
+    case charging
+
+    var color: Color {
+      switch self {
+      case .system: .blue
+      case .charging: .green
+      }
+    }
+  }
+
+  let timestamp: Date
+  let watts: Double
+  let series: Series
+
+  var id: String {
+    "\(timestamp.timeIntervalSinceReferenceDate):\(series.rawValue)"
   }
 }

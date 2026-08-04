@@ -35,6 +35,8 @@ struct PortToolView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      SystemToolPageHeader(destination: .ports)
+
       if store.isLoading && store.records.isEmpty {
         ProgressView("Reading Listening Ports")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -86,7 +88,6 @@ struct PortToolView: View {
         .disabled(selectedRecord == nil)
       }
     }
-    .navigationTitle("Ports")
     .searchable(text: $searchText, prompt: "Search Ports and Software")
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {

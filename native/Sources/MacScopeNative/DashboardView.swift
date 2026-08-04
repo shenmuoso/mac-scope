@@ -128,34 +128,37 @@ struct DashboardView: View {
   }
 
   var body: some View {
-    HStack(spacing: 0) {
-      VStack(spacing: 0) {
-        SystemOverview(
-          temperatureUnit: settings.temperatureUnit,
-          language: settings.language,
-          theme: settings.activeTheme
-        )
-        Divider()
-        processHeader
-        if sortsBySoftware {
-          softwareGroups
-        } else {
-          processTable
+    VStack(spacing: 0) {
+      SystemToolPageHeader(destination: .overview)
+
+      HStack(spacing: 0) {
+        VStack(spacing: 0) {
+          SystemOverview(
+            temperatureUnit: settings.temperatureUnit,
+            language: settings.language,
+            theme: settings.activeTheme
+          )
+          Divider()
+          processHeader
+          if sortsBySoftware {
+            softwareGroups
+          } else {
+            processTable
+          }
+          Divider()
+          SystemStatusBar(
+            isPaused: monitor.isPaused,
+            processCount: monitor.processes.count
+          )
         }
-        Divider()
-        SystemStatusBar(
-          isPaused: monitor.isPaused,
-          processCount: monitor.processes.count
-        )
-      }
-      if showsInspector {
-        Divider()
-        inspectorPane
-          .frame(width: 340)
+        if showsInspector {
+          Divider()
+          inspectorPane
+            .frame(width: 340)
+        }
       }
     }
     .background(Color(nsColor: .windowBackgroundColor))
-    .navigationTitle("MacScope")
     .searchable(text: $searchText, placement: .toolbar, prompt: "Search Processes and Software")
     .toolbar {
       ToolbarItemGroup(placement: .navigation) {

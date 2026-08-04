@@ -373,6 +373,24 @@ final class BatteryInfoStore: ObservableObject {
   @Published private(set) var isLoading = false
 
   private let service = BatteryInfoService()
+  private var monitoringTask: Task<Void, Never>?
+
+  func startMonitoring() {
+    guard monitoringTask == nil else { return }
+    refresh()
+    monitoringTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: 30_000_000_000)
+        guard !Task.isCancelled else { return }
+        self?.refresh()
+      }
+    }
+  }
+
+  func stopMonitoring() {
+    monitoringTask?.cancel()
+    monitoringTask = nil
+  }
 
   func refresh() {
     guard !isLoading else { return }

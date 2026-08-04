@@ -18,18 +18,7 @@ struct JunkCleanupView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolHeader(
-        "Junk Cleanup",
-        subtitle: "Caches, logs, diagnostics, and developer data."
-      ) {
-        if !store.junkItems.isEmpty {
-          Button(action: store.scanJunk) {
-            Label("Scan", systemImage: "arrow.clockwise")
-          }
-          .disabled(store.isBusy)
-        }
-      }
-      Divider()
+      SystemToolPageHeader(destination: .junk)
 
       if store.activity?.tool == .junk {
         MaintenanceActivityInlineView(tool: .junk)
@@ -69,7 +58,15 @@ struct JunkCleanupView: View {
         }
       }
     }
-    .navigationTitle(AppLocalization.string("Junk Cleanup", language: settings.language))
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button(action: store.scanJunk) {
+          Label("Scan", systemImage: "arrow.clockwise")
+        }
+        .help("Scan for Junk")
+        .disabled(store.isBusy)
+      }
+    }
     .onAppear(perform: synchronizeSelection)
     .onChange(of: store.junkItems.map(\.id)) { _ in synchronizeSelection() }
     .alert(cleanupTitle, isPresented: $confirmsCleanup) {

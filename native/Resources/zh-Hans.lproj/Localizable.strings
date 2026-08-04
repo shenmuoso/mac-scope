@@ -463,3 +463,15 @@
 "Old Download" = "旧文件";
 "Scanning Downloads" = "正在扫描下载文件夹";
 "Cleaning Downloads" = "正在清理下载文件";
+"Live CPU, memory, disk, network, and process activity." = "实时查看 CPU、内存、磁盘、网络和进程活动。";
+"Hardware, storage, displays, and connected devices on this Mac." = "查看这台 Mac 的硬件、存储、显示器和已连接设备。";
+"Charge, capacity, cycle count, temperature, and power activity." = "查看电量、容量、循环次数、温度和功率变化。";
+"Listening ports and the processes and software using them." = "查看监听端口及其所属进程和软件。";
+"Installers, archives, and older files in your Downloads folder." = "查找下载文件夹中的安装包、压缩包和旧文件。";
+"Recent Power Activity" = "近期功率变化";
+"Last 60 Seconds" = "最近 60 秒";
+"60 Seconds Ago" = "60 秒前";
+"Now" = "现在";
+"Collecting Power Activity" = "正在采集功率数据";
+"Capacity Comparison" = "容量对比";
+"Battery Status" = "电池状态";

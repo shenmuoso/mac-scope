@@ -61,6 +61,7 @@ struct MacScopeRootView: View {
       .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
     } detail: {
       detailContent
+        .navigationTitle("")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
           Color(nsColor: .windowBackgroundColor)

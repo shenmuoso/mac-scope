@@ -37,6 +37,8 @@ struct DownloadCleanupView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      SystemToolPageHeader(destination: .downloads)
+
       MaintenanceActivityInlineView(tool: .downloads)
 
       if store.downloadItems.isEmpty {
@@ -58,7 +60,6 @@ struct DownloadCleanupView: View {
         }
       }
     }
-    .navigationTitle("Downloads Cleanup")
     .searchable(text: $searchText, prompt: "Search Downloads")
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {

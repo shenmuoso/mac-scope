@@ -26,23 +26,7 @@ struct ApplicationsToolView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolHeader(
-        "Applications",
-        subtitle: "Installed applications and their related data."
-      ) {
-        if !store.applications.isEmpty {
-          Button(action: store.scanApplications) {
-            Label("Scan", systemImage: "arrow.clockwise")
-          }
-          .disabled(store.isBusy)
-
-          Button(action: beginUninstall) {
-            Label("Uninstall", systemImage: "trash")
-          }
-          .disabled(selectedRecord == nil || store.isBusy)
-        }
-      }
-      Divider()
+      SystemToolPageHeader(destination: .applications)
 
       if store.activity?.tool == .applications {
         MaintenanceActivityInlineView(tool: .applications)
@@ -78,8 +62,22 @@ struct ApplicationsToolView: View {
         }
       }
     }
-    .navigationTitle(AppLocalization.string("Applications", language: settings.language))
     .searchable(text: $searchText, placement: .toolbar, prompt: "Search Applications")
+    .toolbar {
+      ToolbarItemGroup(placement: .primaryAction) {
+        Button(action: store.scanApplications) {
+          Label("Scan", systemImage: "arrow.clockwise")
+        }
+        .help("Scan Applications")
+        .disabled(store.isBusy)
+
+        Button(action: beginUninstall) {
+          Label("Uninstall", systemImage: "trash")
+        }
+        .help("Uninstall")
+        .disabled(selectedRecord == nil || store.isBusy)
+      }
+    }
     .onChange(of: store.applications.map(\.id)) { ids in
       if let selection, !ids.contains(selection) {
         self.selection = nil

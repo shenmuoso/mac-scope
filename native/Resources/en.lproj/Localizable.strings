@@ -463,3 +463,15 @@
 "Old Download" = "Old Download";
 "Scanning Downloads" = "Scanning Downloads";
 "Cleaning Downloads" = "Cleaning Downloads";
+"Live CPU, memory, disk, network, and process activity." = "Live CPU, memory, disk, network, and process activity.";
+"Hardware, storage, displays, and connected devices on this Mac." = "Hardware, storage, displays, and connected devices on this Mac.";
+"Charge, capacity, cycle count, temperature, and power activity." = "Charge, capacity, cycle count, temperature, and power activity.";
+"Listening ports and the processes and software using them." = "Listening ports and the processes and software using them.";
+"Installers, archives, and older files in your Downloads folder." = "Installers, archives, and older files in your Downloads folder.";
+"Recent Power Activity" = "Recent Power Activity";
+"Last 60 Seconds" = "Last 60 Seconds";
+"60 Seconds Ago" = "60 Seconds Ago";
+"Now" = "Now";
+"Collecting Power Activity" = "Collecting Power Activity";
+"Capacity Comparison" = "Capacity Comparison";
+"Battery Status" = "Battery Status";
