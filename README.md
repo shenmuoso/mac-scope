@@ -28,11 +28,9 @@
 </p>
 
 > [!TIP]
-> **0.4.10 新增系统信息、电池健康、端口占用和下载清理。** 集中查看 Mac 硬件与连接状态、电池容量和循环次数，定位监听端口，并安全整理下载文件夹。[查看完整更新说明](docs/releases/v0.4.10.md)。
+> **0.4.10 新增系统信息、电池健康、端口占用和下载清理。** 集中查看 Mac 硬件与连接状态、电池容量和循环次数，定位监听端口，并安全整理下载文件夹。
 
 MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界面中。它由 SwiftUI 与 AppKit 构建，不包含 Electron、内置浏览器或额外运行时；无需终端、Python 和 Homebrew，安装后即可使用。
-
-![MacScope 0.4.10 系统概览、软件进程分类与菜单栏看板](docs/images/macscope-overview-0.4.10.png)
 
 ## 为什么选择 MacScope
 
@@ -56,8 +54,6 @@ MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界
 - 查看按 CPU、内存、磁盘或网络排序的 Top 进程。
 - 自定义看板模块与进程数量；关闭主窗口后仍可继续监控。
 - 看板默认采用克制的单色样式，也可以开启“彩色模式”，仅对图表和动态状态使用颜色。
-
-![MacScope 原生设置、菜单栏看板与系统信息](docs/images/macscope-settings-menu-bar-0.4.10.png)
 
 ### 实时资源监控
 
@@ -92,11 +88,6 @@ MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界
 - MacBook 可查看当前电量、最大容量、设计容量、循环次数、电池状态和充放电功率。
 - 不支持的硬件字段会保持不可用，不会用估算值冒充真实读数。
 
-<p align="center">
-  <a href="docs/images/macscope-system-information-0.4.10.png"><img src="docs/images/macscope-system-information-0.4.10.png" width="49%" alt="MacScope 系统硬件信息"></a>
-  <a href="docs/images/macscope-battery-health-0.4.10.png"><img src="docs/images/macscope-battery-health-0.4.10.png" width="49%" alt="MacScope 电池健康看板"></a>
-</p>
-
 ### 端口与下载工具
 
 - **端口占用：** 查看当前 TCP 和 UDP 监听端口、地址、PID、进程与所属软件；支持筛选、复制、打开本机地址和结束进程。
@@ -115,8 +106,6 @@ MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界
 - 缓存可设置为移到废纸篓或永久删除，默认采用更稳妥的废纸篓模式。
 - 无法处理的项目保留明确原因，解决权限问题后可以重试。
 
-![MacScope 垃圾扫描、项目选择与清理结果](docs/images/macscope-junk-cleanup.png)
-
 ### 应用卸载与残留清除
 
 卸载应用不应只把一个图标拖走。MacScope 将应用本体与相关数据放在同一个确认流程中处理。
@@ -127,8 +116,6 @@ MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界
 - 显示卸载路径与实时进度；完成后的成功结果、失败原因和权限处理入口集中在独立结果窗口中。
 - 卸载 `/Applications` 中的受保护应用时，确认后立即显示 macOS 原生管理员授权对话框，不再先失败再重试。
 - 先确认应用本体能够移除，再处理相关数据，避免留下一个被清空数据但仍存在的应用。
-
-![MacScope 应用扫描、卸载与残留清除](docs/images/macscope-applications.png)
 
 ### 磁盘与资源管理
 

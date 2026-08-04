@@ -12,3 +12,4 @@ work/
 native/.build/
 native/.swiftpm/
 native/build/
+/docs/
