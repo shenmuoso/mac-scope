@@ -43,6 +43,8 @@ actor SystemSampler {
   private var previousProcessTime = ProcessInfo.processInfo.systemUptime
   private var temperature = TemperatureUsage.unavailable
   private var temperatureUpdatedAt = -TimeInterval.infinity
+  private var power = PowerUsage.unavailable
+  private var powerUpdatedAt = -TimeInterval.infinity
 
   func sampleMetrics() -> SystemSnapshot {
     let now = ProcessInfo.processInfo.systemUptime
@@ -50,6 +52,10 @@ actor SystemSampler {
     if now - temperatureUpdatedAt >= 2 {
       temperature = readTemperatureUsage()
       temperatureUpdatedAt = now
+    }
+    if now - powerUpdatedAt >= 1 {
+      power = PowerMetricsReader.read()
+      powerUpdatedAt = now
     }
     let cpuTicks = readCPUTicks()
     let diskCounters = readDiskCounters()
@@ -98,6 +104,7 @@ actor SystemSampler {
       memory: memory,
       disk: disk,
       network: network,
+      power: power,
       processes: []
     )
   }

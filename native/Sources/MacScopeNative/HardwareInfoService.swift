@@ -271,17 +271,9 @@ actor BatteryInfoService {
     let maximum = max(1, number(properties["MaxCapacity"]) ?? number(batteryData["MaxCapacity"]) ?? 100)
     let designCapacity = number(batteryData["DesignCapacity"])
     let fullChargeCapacity = number(batteryData["FullChargeCapacity"])
-    let batteryPower = number(batteryData["BatteryPower"])
     let voltage = number(properties["Voltage"])
     let amperage = number(properties["InstantAmperage"]) ?? number(properties["Amperage"])
-    let powerWatts: Double?
-    if let batteryPower {
-      powerWatts = Double(batteryPower) / 1_000
-    } else if let voltage, let amperage {
-      powerWatts = Double(voltage * amperage) / 1_000_000
-    } else {
-      powerWatts = nil
-    }
+    let powerUsage = PowerMetricsReader.read(batteryProperties: properties)
 
     let healthPercent: Double?
     if let designCapacity, designCapacity > 0, let fullChargeCapacity {
@@ -316,7 +308,8 @@ actor BatteryInfoService {
       remainingCapacityMAh: number(batteryData["RemainingCapacity"]),
       voltageMillivolts: voltage,
       amperageMilliamps: amperage,
-      powerWatts: powerWatts,
+      systemPowerWatts: powerUsage.systemWatts,
+      chargingPowerWatts: powerUsage.chargingWatts,
       temperatureCelsius: temperature,
       condition: condition
     )

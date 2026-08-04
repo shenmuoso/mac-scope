@@ -337,6 +337,11 @@
 "Disk Activity" = "Disk Activity";
 "Network Activity" = "Network Activity";
 "CPU Temperature" = "CPU Temperature";
+"System Power" = "System Power";
+"Charging Power" = "Charging Power";
+"Power Telemetry Unavailable" = "Power Telemetry Unavailable";
+"Live System Load" = "Live System Load";
+"Not Charging" = "Not Charging";
 "Top Processes" = "Top Processes";
 "Process sorting" = "Process sorting";
 "Process count" = "Process count";

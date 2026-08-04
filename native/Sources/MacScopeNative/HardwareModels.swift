@@ -89,7 +89,8 @@ struct BatterySnapshot: Sendable {
   let remainingCapacityMAh: Int?
   let voltageMillivolts: Int?
   let amperageMilliamps: Int?
-  let powerWatts: Double?
+  let systemPowerWatts: Double?
+  let chargingPowerWatts: Double?
   let temperatureCelsius: Double?
   let condition: BatteryCondition
 }

@@ -2,22 +2,17 @@ import AppKit
 import SwiftUI
 
 @MainActor
-private enum MenuBarLogoAsset {
+enum MenuBarLogoAsset {
   static let image: NSImage = {
-    let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { bounds in
-      let minimum = min(bounds.width, bounds.height)
-      let lineWidth = max(1.5, minimum * 0.105)
-      let symbolBounds = CGRect(
-        x: bounds.midX - minimum / 2 + lineWidth / 2,
-        y: bounds.midY - minimum / 2 + lineWidth / 2,
-        width: minimum - lineWidth,
-        height: minimum - lineWidth
-      )
+    let image = NSImage(size: NSSize(width: 16, height: 16), flipped: true) { bounds in
+      let outlineWidth: CGFloat = 1.25
+      let waveformWidth: CGFloat = 1.15
+      let symbolBounds = bounds.insetBy(dx: 1, dy: 1)
 
       NSColor.black.setStroke()
 
       let outline = NSBezierPath(ovalIn: symbolBounds)
-      outline.lineWidth = lineWidth
+      outline.lineWidth = outlineWidth
       outline.stroke()
 
       let points: [CGPoint] = [
@@ -42,7 +37,7 @@ private enum MenuBarLogoAsset {
           waveform.line(to: scaled)
         }
       }
-      waveform.lineWidth = lineWidth
+      waveform.lineWidth = waveformWidth
       waveform.lineCapStyle = .round
       waveform.lineJoinStyle = .round
       waveform.stroke()
@@ -67,20 +62,6 @@ struct MenuBarLogo: View {
   }
 }
 
-struct MenuBarStatusLabel: View {
-  @EnvironmentObject private var metrics: SystemMetricsStore
-  @EnvironmentObject private var settings: AppSettings
-
-  var body: some View {
-    MenuBarStatusContent(
-      snapshot: metrics.snapshot,
-      displayMode: settings.menuBarDisplayMode,
-      selectedMetrics: settings.menuBarMetrics,
-      temperatureUnit: settings.temperatureUnit
-    )
-  }
-}
-
 struct MenuBarStatusContent: View {
   let snapshot: SystemSnapshot
   let displayMode: MenuBarDisplayMode
@@ -88,12 +69,19 @@ struct MenuBarStatusContent: View {
   let temperatureUnit: TemperatureUnit
 
   var body: some View {
-    HStack(spacing: 5) {
-      MenuBarLogo()
-        .frame(width: 17, height: 17)
+    let presentation = MenuBarStatusPresentation(
+      snapshot: snapshot,
+      displayMode: displayMode,
+      selectedMetrics: selectedMetrics,
+      temperatureUnit: temperatureUnit
+    )
 
-      if displayMode == .compact, !selectedMetrics.isEmpty {
-        Text(compactValue)
+    HStack(spacing: 10) {
+      MenuBarLogo()
+        .frame(width: 16, height: 16)
+
+      if let compactText = presentation.compactText {
+        Text(compactText)
           .monospacedDigit()
           .lineLimit(1)
           .fixedSize(horizontal: true, vertical: false)
@@ -101,14 +89,30 @@ struct MenuBarStatusContent: View {
     }
     .fixedSize()
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(accessibilityValue)
+    .accessibilityLabel(presentation.accessibilityLabel)
+  }
+}
+
+struct MenuBarStatusPresentation {
+  let snapshot: SystemSnapshot
+  let displayMode: MenuBarDisplayMode
+  let selectedMetrics: [MenuBarMetric]
+  let temperatureUnit: TemperatureUnit
+
+  var compactText: String? {
+    guard displayMode == .compact, !selectedMetrics.isEmpty else { return nil }
+    return selectedMetrics.map(value(for:)).joined(separator: " · ")
   }
 
-  private var compactValue: String {
-    selectedMetrics.map(value(for:)).joined(separator: " · ")
+  var accessibilityLabel: String {
+    guard compactText != nil else { return "MacScope" }
+    let values = selectedMetrics.map { metric in
+      "\(metric.title), \(value(for: metric))"
+    }.joined(separator: ", ")
+    return "MacScope, \(values)"
   }
 
-  private func value(for metric: MenuBarMetric) -> String {
+  func value(for metric: MenuBarMetric) -> String {
     switch metric {
     case .cpu:
       return "CPU \(DisplayFormat.compactPercent(snapshot.cpu.total))"
@@ -125,13 +129,10 @@ struct MenuBarStatusContent: View {
         snapshot.cpu.temperature.socCelsius,
         unit: temperatureUnit
       ) ?? "--°"
+    case .systemPower:
+      return "PWR \(DisplayFormat.compactPower(snapshot.power.systemWatts))"
+    case .chargingPower:
+      return "CHG \(DisplayFormat.compactPower(snapshot.power.chargingWatts))"
     }
-  }
-
-  private var accessibilityValue: String {
-    guard displayMode == .compact, !selectedMetrics.isEmpty else { return "MacScope" }
-    return selectedMetrics.map { metric in
-      "\(metric.title), \(value(for: metric))"
-    }.joined(separator: ", ")
   }
 }

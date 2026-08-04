@@ -32,6 +32,16 @@ enum DisplayFormat {
     }
   }
 
+  static func power(_ watts: Double?) -> String? {
+    guard let watts, watts.isFinite, watts >= 0 else { return nil }
+    return String(format: watts < 100 ? "%.1f W" : "%.0f W", watts)
+  }
+
+  static func compactPower(_ watts: Double?) -> String {
+    guard let watts, watts.isFinite, watts >= 0 else { return "--" }
+    return String(format: watts < 100 ? "%.1fW" : "%.0fW", watts)
+  }
+
   static func temperature(_ celsius: Double?, unit: TemperatureUnit) -> String? {
     guard let celsius, celsius.isFinite else { return nil }
     switch unit {

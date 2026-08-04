@@ -18,7 +18,10 @@ struct MacScopeNativeApp: App {
         .tint(runtime.settings.activeTheme.accentColor)
         .frame(minWidth: 1_020, minHeight: 620)
         .background {
-          MainWindowConfigurationView()
+          ZStack {
+            MainWindowConfigurationView()
+            MainWindowOpenActionBridge(runtime: runtime)
+          }
             .allowsHitTesting(false)
         }
     }
@@ -42,31 +45,6 @@ struct MacScopeNativeApp: App {
         }
     }
 
-    MenuBarExtra(
-      isInserted: Binding(
-        get: { runtime.settings.menuBarEnabled },
-        set: { isEnabled in
-          guard runtime.settings.menuBarEnabled != isEnabled else { return }
-          runtime.settings.menuBarEnabled = isEnabled
-        }
-      )
-    ) {
-      MenuBarDashboardView()
-        .environmentObject(runtime.monitor)
-        .environmentObject(runtime.monitor.metrics)
-        .environmentObject(runtime.settings)
-        .environmentObject(runtime.navigation)
-        .environment(\.locale, runtime.settings.language.locale)
-        .preferredColorScheme(runtime.settings.appearance.colorScheme)
-        .tint(runtime.settings.activeTheme.accentColor)
-    } label: {
-      MenuBarStatusLabel()
-        .environmentObject(runtime.monitor.metrics)
-        .environmentObject(runtime.settings)
-        .environment(\.locale, runtime.settings.language.locale)
-    }
-    .menuBarExtraStyle(.window)
-
     Window("MacScope Help", id: "help") {
       HelpView()
         .environmentObject(runtime.settings)
@@ -77,5 +55,23 @@ struct MacScopeNativeApp: App {
     }
     .defaultSize(width: 780, height: 560)
     .windowStyle(.titleBar)
+  }
+}
+
+@MainActor
+private struct MainWindowOpenActionBridge: View {
+  @Environment(\.openWindow) private var openWindow
+
+  let runtime: AppRuntime
+
+  var body: some View {
+    Color.clear
+      .onAppear {
+        let action = openWindow
+        runtime.setOpenMainWindowHandler {
+          action(id: "main")
+        }
+        runtime.start()
+      }
   }
 }

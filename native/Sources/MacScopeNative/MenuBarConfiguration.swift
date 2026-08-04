@@ -13,6 +13,8 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
   case disk
   case network
   case temperature
+  case systemPower
+  case chargingPower
 
   var id: String { rawValue }
 
@@ -23,6 +25,8 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
     case .disk: "Disk Activity"
     case .network: "Network Activity"
     case .temperature: "CPU Temperature"
+    case .systemPower: "System Power"
+    case .chargingPower: "Charging Power"
     }
   }
 
@@ -33,6 +37,8 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
     case .disk: "internaldrive"
     case .network: "network"
     case .temperature: "thermometer.medium"
+    case .systemPower: "bolt.fill"
+    case .chargingPower: "battery.100percent.bolt"
     }
   }
 }
@@ -43,6 +49,8 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
   case disk
   case network
   case temperature
+  case systemPower
+  case chargingPower
   case processes
 
   var id: String { rawValue }
@@ -54,6 +62,8 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
     case .disk: "Disk"
     case .network: "Network"
     case .temperature: "Temperature"
+    case .systemPower: "System Power"
+    case .chargingPower: "Charging Power"
     case .processes: "Top Processes"
     }
   }
@@ -65,6 +75,8 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
     case .disk: "internaldrive"
     case .network: "network"
     case .temperature: "thermometer.medium"
+    case .systemPower: "bolt.fill"
+    case .chargingPower: "battery.100percent.bolt"
     case .processes: "list.number"
     }
   }

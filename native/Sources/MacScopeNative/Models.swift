@@ -28,6 +28,24 @@ struct CPUUsage: Sendable {
   var temperature: TemperatureUsage
 }
 
+struct PowerUsage: Sendable, Equatable {
+  var systemWatts: Double?
+  var chargingWatts: Double?
+  var adapterInputWatts: Double?
+  var hasBattery: Bool
+  var isExternalPowerConnected: Bool?
+  var isCharging: Bool
+
+  static let unavailable = PowerUsage(
+    systemWatts: nil,
+    chargingWatts: nil,
+    adapterInputWatts: nil,
+    hasBattery: false,
+    isExternalPowerConnected: nil,
+    isCharging: false
+  )
+}
+
 struct MemoryUsage: Sendable {
   var used: UInt64
   var available: UInt64
@@ -297,6 +315,8 @@ struct SystemHistoryPoint: Identifiable, Sendable {
   let networkDownloadRate: Double
   let networkUploadRate: Double
   let temperatureCelsius: Double?
+  let systemPowerWatts: Double?
+  let chargingPowerWatts: Double?
 
   var id: Date { timestamp }
 }
@@ -307,6 +327,7 @@ struct SystemSnapshot: Sendable {
   var memory: MemoryUsage
   var disk: DiskUsage
   var network: NetworkUsage
+  var power: PowerUsage
   var processes: [ProcessRow]
 
   static let empty = SystemSnapshot(
@@ -315,6 +336,7 @@ struct SystemSnapshot: Sendable {
     memory: MemoryUsage(used: 0, available: 0, total: 0),
     disk: DiskUsage(used: 0, available: 0, total: 0, readRate: 0, writeRate: 0),
     network: NetworkUsage(downloadRate: 0, uploadRate: 0, downloadTotal: 0, uploadTotal: 0),
+    power: .unavailable,
     processes: []
   )
 }

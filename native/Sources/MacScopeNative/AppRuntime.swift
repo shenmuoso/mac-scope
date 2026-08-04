@@ -8,6 +8,9 @@ final class AppRuntime: ObservableObject {
   let maintenance: MaintenanceStore
   let navigation: AppNavigation
 
+  private var menuBarController: MenuBarController?
+  private var openMainWindowHandler: (() -> Void)?
+  private var hasStarted = false
   private var cancellables: Set<AnyCancellable> = []
 
   init() {
@@ -20,7 +23,6 @@ final class AppRuntime: ObservableObject {
       settings.$language.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
       settings.$appearance.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
       settings.$themeID.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
-      settings.$menuBarEnabled.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
     ]
     Publishers.MergeMany(sceneSettingsChanges)
       .sink { [weak self] in
@@ -47,13 +49,29 @@ final class AppRuntime: ObservableObject {
         }
       }
       .store(in: &cancellables)
+  }
 
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
-      self.monitor.updateRefreshInterval(self.settings.refreshInterval)
-      self.monitor.start()
-      self.maintenance.updateLanguage(self.settings.language)
-      AppIconController.apply(self.settings.appIconStyle)
+  func start() {
+    guard !hasStarted else { return }
+    hasStarted = true
+
+    let menuBarController = MenuBarController(
+      monitor: monitor,
+      settings: settings,
+      navigation: navigation
+    )
+    if let openMainWindowHandler {
+      menuBarController.setOpenMainWindowHandler(openMainWindowHandler)
     }
+    self.menuBarController = menuBarController
+    monitor.updateRefreshInterval(settings.refreshInterval)
+    monitor.start()
+    maintenance.updateLanguage(settings.language)
+    AppIconController.apply(settings.appIconStyle)
+  }
+
+  func setOpenMainWindowHandler(_ handler: @escaping () -> Void) {
+    openMainWindowHandler = handler
+    menuBarController?.setOpenMainWindowHandler(handler)
   }
 }

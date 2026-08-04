@@ -337,6 +337,11 @@
 "Disk Activity" = "磁盘活动";
 "Network Activity" = "网络活动";
 "CPU Temperature" = "CPU 温度";
+"System Power" = "整机功耗";
+"Charging Power" = "充电功率";
+"Power Telemetry Unavailable" = "功耗遥测不可用";
+"Live System Load" = "实时系统负载";
+"Not Charging" = "未在充电";
 "Top Processes" = "进程排行";
 "Process sorting" = "进程排序";
 "Process count" = "进程数量";
