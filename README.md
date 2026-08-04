@@ -32,6 +32,8 @@
 
 MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界面中。它由 SwiftUI 与 AppKit 构建，不包含 Electron、内置浏览器或额外运行时；无需终端、Python 和 Homebrew，安装后即可使用。
 
+![MacScope 0.4.10 主界面与菜单栏看板](.github/assets/macscope-preview.png)
+
 ## 为什么选择 MacScope
 
 | | 你得到的体验 |
