@@ -212,6 +212,11 @@
 "Scanning" = "Scanning";
 "Completed" = "Completed";
 "Cancelled" = "Cancelled";
+"Task Complete" = "Task Complete";
+"Completed with Issues" = "Completed with Issues";
+"Operation Cancelled" = "Operation Cancelled";
+"The operation was cancelled." = "The operation was cancelled.";
+"Files Scanned" = "Files Scanned";
 "Open Full Disk Access" = "Open Full Disk Access";
 "Files & Folders Access Required" = "Files & Folders Access Required";
 "Full Disk Access Required" = "Full Disk Access Required";

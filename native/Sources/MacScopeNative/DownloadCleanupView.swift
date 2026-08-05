@@ -39,24 +39,31 @@ struct DownloadCleanupView: View {
     VStack(spacing: 0) {
       SystemToolPageHeader(destination: .downloads)
 
-      MaintenanceActivityInlineView(tool: .downloads)
-
-      if store.downloadItems.isEmpty {
-        emptyState
+      if store.downloadItems.isEmpty, store.activity?.tool == .downloads {
+        MaintenanceActivityProminentView(tool: .downloads)
       } else {
-        filterBar
-        Divider()
-        downloadTable
-        Divider()
-        SystemToolStatusBar(
-          summary: localized(
-            "%lld selected · %@",
-            Int64(selectedItems.count),
-            DisplayFormat.bytes(selectedSize)
-          )
-        ) {
-          Button("Move to Trash", role: .destructive, action: requestRemoval)
-            .disabled(selectedItems.isEmpty || store.isBusy)
+        if store.activity?.tool == .downloads {
+          MaintenanceActivityInlineView(tool: .downloads)
+          Divider()
+        }
+
+        if store.downloadItems.isEmpty {
+          emptyState
+        } else {
+          filterBar
+          Divider()
+          downloadTable
+          Divider()
+          SystemToolStatusBar(
+            summary: localized(
+              "%lld selected · %@",
+              Int64(selectedItems.count),
+              DisplayFormat.bytes(selectedSize)
+            )
+          ) {
+            Button("Move to Trash", role: .destructive, action: requestRemoval)
+              .disabled(selectedItems.isEmpty || store.isBusy)
+          }
         }
       }
     }

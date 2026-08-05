@@ -342,7 +342,7 @@ final class MaintenanceStore: ObservableObject {
   private func updateScanProgress(_ progress: ScanProgress) {
     guard activity?.phase == .scanning else { return }
     let now = ProcessInfo.processInfo.systemUptime
-    guard now - lastScanProgressUpdate >= 0.1 else { return }
+    guard now - lastScanProgressUpdate >= 0.2 else { return }
     lastScanProgressUpdate = now
     guard var nextActivity = activity else { return }
     nextActivity.completed = progress.scannedCount

@@ -29,29 +29,31 @@ struct FileCleanupView: View {
     VStack(spacing: 0) {
       SystemToolPageHeader(destination: isDuplicateMode ? .duplicates : .largeFiles)
 
-      if store.activity?.tool == tool {
-        MaintenanceActivityInlineView(tool: tool)
-        Divider()
-      }
-
-      if items.isEmpty, store.activity?.tool == tool, store.isBusy {
-        Spacer()
-      } else if items.isEmpty {
-        emptyState
+      if items.isEmpty, store.activity?.tool == tool {
+        MaintenanceActivityProminentView(tool: tool)
       } else {
-        selectionBar
-        Divider()
-        fileTable
-        Divider()
-        SystemToolStatusBar(
-          summary: localized(
-            "%lld selected · %@",
-            Int64(selectedItems.count),
-            DisplayFormat.bytes(selectedSize)
-          )
-        ) {
-          Button("Move to Trash", role: .destructive, action: requestRemoval)
-            .disabled(selectedItems.isEmpty || store.isBusy)
+        if store.activity?.tool == tool {
+          MaintenanceActivityInlineView(tool: tool)
+          Divider()
+        }
+
+        if items.isEmpty {
+          emptyState
+        } else {
+          selectionBar
+          Divider()
+          fileTable
+          Divider()
+          SystemToolStatusBar(
+            summary: localized(
+              "%lld selected · %@",
+              Int64(selectedItems.count),
+              DisplayFormat.bytes(selectedSize)
+            )
+          ) {
+            Button("Move to Trash", role: .destructive, action: requestRemoval)
+              .disabled(selectedItems.isEmpty || store.isBusy)
+          }
         }
       }
     }

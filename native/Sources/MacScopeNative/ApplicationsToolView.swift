@@ -28,36 +28,38 @@ struct ApplicationsToolView: View {
     VStack(spacing: 0) {
       SystemToolPageHeader(destination: .applications)
 
-      if store.activity?.tool == .applications {
-        MaintenanceActivityInlineView(tool: .applications)
-        Divider()
-      }
-
-      if store.applications.isEmpty, store.activity?.tool == .applications, store.isBusy {
-        Spacer()
-      } else if store.applications.isEmpty {
-        SystemToolEmptyView(
-          systemImage: store.scannedTools.contains(.applications) ? "checkmark.circle" : "app.dashed",
-          title: store.scannedTools.contains(.applications) ? "No Applications Found" : "Ready to Scan",
-          message: store.scannedTools.contains(.applications)
-            ? "No applications were found in the standard application folders."
-            : "Scan the standard application folders and related user data."
-        ) {
-          Button(action: store.scanApplications) {
-            Label("Scan Applications", systemImage: "magnifyingglass")
-          }
-          .buttonStyle(.borderedProminent)
-          .disabled(store.isBusy)
-        }
+      if store.applications.isEmpty, store.activity?.tool == .applications {
+        MaintenanceActivityProminentView(tool: .applications)
       } else {
-        applicationTable
-        Divider()
-        SystemToolStatusBar(summary: applicationSummary) {
-          if let selectedRecord {
-            Text(DisplayFormat.bytes(selectedRecord.totalSize))
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-              .monospacedDigit()
+        if store.activity?.tool == .applications {
+          MaintenanceActivityInlineView(tool: .applications)
+          Divider()
+        }
+
+        if store.applications.isEmpty {
+          SystemToolEmptyView(
+            systemImage: store.scannedTools.contains(.applications) ? "checkmark.circle" : "app.dashed",
+            title: store.scannedTools.contains(.applications) ? "No Applications Found" : "Ready to Scan",
+            message: store.scannedTools.contains(.applications)
+              ? "No applications were found in the standard application folders."
+              : "Scan the standard application folders and related user data."
+          ) {
+            Button(action: store.scanApplications) {
+              Label("Scan Applications", systemImage: "magnifyingglass")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(store.isBusy)
+          }
+        } else {
+          applicationTable
+          Divider()
+          SystemToolStatusBar(summary: applicationSummary) {
+            if let selectedRecord {
+              Text(DisplayFormat.bytes(selectedRecord.totalSize))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            }
           }
         }
       }

@@ -212,6 +212,11 @@
 "Scanning" = "正在扫描";
 "Completed" = "已完成";
 "Cancelled" = "已取消";
+"Task Complete" = "任务已完成";
+"Completed with Issues" = "任务完成，但存在问题";
+"Operation Cancelled" = "任务已取消";
+"The operation was cancelled." = "操作已取消，未继续处理剩余项目。";
+"Files Scanned" = "已扫描文件";
 "Open Full Disk Access" = "打开完全磁盘访问权限";
 "Files & Folders Access Required" = "需要文件与文件夹权限";
 "Full Disk Access Required" = "需要完全磁盘访问权限";
