@@ -40,15 +40,6 @@ struct MenuBarDashboardView: View {
           .allowsHitTesting(false)
       }
     }
-    .onAppear {
-      updateProcessSampling()
-    }
-    .onDisappear {
-      monitor.setProcessSampling(false, for: .menuBar)
-    }
-    .onChange(of: settings.menuBarModules) { _ in
-      updateProcessSampling()
-    }
   }
 
   private var panelHeight: CGFloat {
@@ -146,10 +137,6 @@ struct MenuBarDashboardView: View {
 
   private var dashboardLogoColor: Color {
     settings.menuBarColorfulMode ? settings.activeTheme.accentColor : .primary
-  }
-
-  private func updateProcessSampling() {
-    monitor.setProcessSampling(settings.menuBarModules.contains(.processes), for: .menuBar)
   }
 
   private func openProcess(_ process: ProcessRow) {

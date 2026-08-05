@@ -3,7 +3,6 @@ import Darwin
 import SwiftUI
 
 struct PortToolView: View {
-  @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var navigation: AppNavigation
   @EnvironmentObject private var settings: AppSettings
   @StateObject private var store = PortInfoStore()
@@ -218,7 +217,6 @@ struct PortToolView: View {
 
   private func inspectProcess() {
     guard let selectedRecord else { return }
-    monitor.setProcessSampling(true, for: .overview)
     navigation.inspectProcess(selectedRecord.pid)
   }
 

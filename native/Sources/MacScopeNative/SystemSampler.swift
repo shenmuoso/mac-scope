@@ -199,15 +199,14 @@ actor SystemSampler {
   }
 
   private func readDiskCapacity() -> (used: UInt64, available: UInt64, total: UInt64) {
-    let keys: Set<URLResourceKey> = [
-      .volumeTotalCapacityKey,
-      .volumeAvailableCapacityForImportantUsageKey,
-    ]
-    guard let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys) else {
+    var statistics = statvfs()
+    guard statvfs("/", &statistics) == 0 else {
       return (0, 0, 0)
     }
-    let total = UInt64(max(0, values.volumeTotalCapacity ?? 0))
-    let available = UInt64(max(0, values.volumeAvailableCapacityForImportantUsage ?? 0))
+
+    let blockSize = UInt64(statistics.f_frsize)
+    let total = UInt64(statistics.f_blocks) * blockSize
+    let available = UInt64(statistics.f_bavail) * blockSize
     return (total - min(total, available), available, total)
   }
 

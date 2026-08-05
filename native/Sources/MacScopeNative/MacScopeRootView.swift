@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct MacScopeRootView: View {
-  @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
 
@@ -11,13 +10,7 @@ struct MacScopeRootView: View {
       set: {
         let nextDestination = $0 ?? .overview
         guard navigation.destination != nextDestination else { return }
-        if navigation.destination == .overview {
-          monitor.setProcessSampling(false, for: .overview)
-        }
         navigation.destination = nextDestination
-        if nextDestination == .overview {
-          monitor.setProcessSampling(true, for: .overview)
-        }
       }
     )
   }
@@ -84,12 +77,6 @@ struct MacScopeRootView: View {
           .help("Settings")
         }
       }
-    }
-    .onAppear {
-      monitor.setProcessSampling(navigation.destination == .overview, for: .overview)
-    }
-    .onDisappear {
-      monitor.setProcessSampling(false, for: .overview)
     }
   }
 
