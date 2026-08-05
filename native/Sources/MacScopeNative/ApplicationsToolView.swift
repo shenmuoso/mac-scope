@@ -26,60 +26,60 @@ struct ApplicationsToolView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolHeader(
-        "Applications",
-        subtitle: "Installed applications and their related data."
-      ) {
-        if !store.applications.isEmpty {
-          Button(action: store.scanApplications) {
-            Label("Scan", systemImage: "arrow.clockwise")
-          }
-          .disabled(store.isBusy)
+      SystemToolPageHeader(destination: .applications)
 
-          Button(action: beginUninstall) {
-            Label("Uninstall", systemImage: "trash")
-          }
-          .disabled(selectedRecord == nil || store.isBusy)
-        }
-      }
-      Divider()
-
-      if store.activity?.tool == .applications {
-        MaintenanceActivityInlineView(tool: .applications)
-        Divider()
-      }
-
-      if store.applications.isEmpty, store.activity?.tool == .applications, store.isBusy {
-        Spacer()
-      } else if store.applications.isEmpty {
-        SystemToolEmptyView(
-          systemImage: store.scannedTools.contains(.applications) ? "checkmark.circle" : "app.dashed",
-          title: store.scannedTools.contains(.applications) ? "No Applications Found" : "Ready to Scan",
-          message: store.scannedTools.contains(.applications)
-            ? "No applications were found in the standard application folders."
-            : "Scan the standard application folders and related user data."
-        ) {
-          Button(action: store.scanApplications) {
-            Label("Scan Applications", systemImage: "magnifyingglass")
-          }
-          .buttonStyle(.borderedProminent)
-          .disabled(store.isBusy)
-        }
+      if store.applications.isEmpty, store.activity?.tool == .applications {
+        MaintenanceActivityProminentView(tool: .applications)
       } else {
-        applicationTable
-        Divider()
-        SystemToolStatusBar(summary: applicationSummary) {
-          if let selectedRecord {
-            Text(DisplayFormat.bytes(selectedRecord.totalSize))
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-              .monospacedDigit()
+        if store.activity?.tool == .applications {
+          MaintenanceActivityInlineView(tool: .applications)
+          Divider()
+        }
+
+        if store.applications.isEmpty {
+          SystemToolEmptyView(
+            systemImage: store.scannedTools.contains(.applications) ? "checkmark.circle" : "app.dashed",
+            title: store.scannedTools.contains(.applications) ? "No Applications Found" : "Ready to Scan",
+            message: store.scannedTools.contains(.applications)
+              ? "No applications were found in the standard application folders."
+              : "Scan the standard application folders and related user data."
+          ) {
+            Button(action: store.scanApplications) {
+              Label("Scan Applications", systemImage: "magnifyingglass")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(store.isBusy)
+          }
+        } else {
+          applicationTable
+          Divider()
+          SystemToolStatusBar(summary: applicationSummary) {
+            if let selectedRecord {
+              Text(DisplayFormat.bytes(selectedRecord.totalSize))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            }
           }
         }
       }
     }
-    .navigationTitle(AppLocalization.string("Applications", language: settings.language))
     .searchable(text: $searchText, placement: .toolbar, prompt: "Search Applications")
+    .toolbar {
+      ToolbarItemGroup(placement: .primaryAction) {
+        Button(action: store.scanApplications) {
+          Label("Scan", systemImage: "arrow.clockwise")
+        }
+        .help("Scan Applications")
+        .disabled(store.isBusy)
+
+        Button(action: beginUninstall) {
+          Label("Uninstall", systemImage: "trash")
+        }
+        .help("Uninstall")
+        .disabled(selectedRecord == nil || store.isBusy)
+      }
+    }
     .onChange(of: store.applications.map(\.id)) { ids in
       if let selection, !ids.contains(selection) {
         self.selection = nil
@@ -187,17 +187,26 @@ struct ApplicationsToolView: View {
 
 private struct ApplicationUninstallView: View {
   @EnvironmentObject private var store: MaintenanceStore
+  @EnvironmentObject private var settings: AppSettings
   @Environment(\.dismiss) private var dismiss
 
   let record: ApplicationRecord
 
   @State private var selectedIDs: Set<MaintenanceItem.ID>
+  @State private var selectedStartupConfigurationIDs: Set<ApplicationStartupConfiguration.ID>
 
   init(record: ApplicationRecord) {
     self.record = record
     _selectedIDs = State(
       initialValue: Set(
         ([record.application] + record.otherCopies + record.residues).map(\.id)
+      )
+    )
+    _selectedStartupConfigurationIDs = State(
+      initialValue: Set(
+        record.startupConfigurations.filter {
+          $0.isDefaultSelected && $0.canRemove
+        }.map(\.id)
       )
     )
   }
@@ -212,6 +221,32 @@ private struct ApplicationUninstallView: View {
 
   private var selectedItems: [MaintenanceItem] {
     (copies + currentRecord.residues).filter { selectedIDs.contains($0.id) }
+  }
+
+  private var selectedStartupConfigurations: [ApplicationStartupConfiguration] {
+    currentRecord.startupConfigurations.filter {
+      selectedStartupConfigurationIDs.contains($0.id)
+    }
+  }
+
+  private var relatedDataItems: [MaintenanceItem] {
+    currentRecord.residues
+  }
+
+  private var confirmedStartupConfigurations: [ApplicationStartupConfiguration] {
+    currentRecord.startupConfigurations.filter {
+      $0.confidence == .confirmed && !$0.isShared
+    }
+  }
+
+  private var likelyStartupConfigurations: [ApplicationStartupConfiguration] {
+    currentRecord.startupConfigurations.filter {
+      $0.confidence == .likely && !$0.isShared
+    }
+  }
+
+  private var sharedStartupConfigurations: [ApplicationStartupConfiguration] {
+    currentRecord.startupConfigurations.filter(\.isShared)
   }
 
   private var allCopiesSelected: Bool {
@@ -274,9 +309,89 @@ private struct ApplicationUninstallView: View {
           }
         }
 
-        if !currentRecord.residues.isEmpty {
+        if case .denied = currentRecord.loginItemsAccess {
+          Section("Login Items Not Checked") {
+            HStack(spacing: 10) {
+              Image(systemName: "lock.app.dashed")
+                .foregroundStyle(.secondary)
+              VStack(alignment: .leading, spacing: 2) {
+                Text("Automation access is required to check Open at Login entries for this application.")
+                Text("You can still uninstall the application, but its login entry may remain.")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              Spacer()
+              Button("Open Automation Settings") {
+                store.openAutomationSettings()
+              }
+              Button("Check Again") {
+                store.scanApplications()
+              }
+              .disabled(store.isBusy)
+            }
+          }
+        }
+
+        if case .unavailable(let message) = currentRecord.loginItemsAccess {
+          Section("Login Items Not Checked") {
+            HStack(spacing: 10) {
+              Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+              VStack(alignment: .leading, spacing: 2) {
+                Text("MacScope could not check Open at Login entries for this application.")
+                Text(verbatim: message)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+                  .lineLimit(2)
+              }
+              Spacer()
+              Button("Check Again") {
+                store.scanApplications()
+              }
+              .disabled(store.isBusy)
+            }
+          }
+        }
+
+        if !confirmedStartupConfigurations.isEmpty {
+          Section("Associated Startup Configurations") {
+            ForEach(confirmedStartupConfigurations) { configuration in
+              startupConfigurationRow(
+                configuration,
+                isSelected: startupConfigurationBinding(configuration),
+                isEnabled: allCopiesSelected && configuration.canRemove
+              )
+            }
+          }
+        }
+
+        if !likelyStartupConfigurations.isEmpty {
+          Section("Possibly Related Startup Configurations") {
+            ForEach(likelyStartupConfigurations) { configuration in
+              startupConfigurationRow(
+                configuration,
+                isSelected: startupConfigurationBinding(configuration),
+                isEnabled: allCopiesSelected && configuration.canRemove
+              )
+            }
+          }
+        }
+
+        if !sharedStartupConfigurations.isEmpty {
+          Section("Shared Background Components") {
+            ForEach(sharedStartupConfigurations) { configuration in
+              startupConfigurationRow(
+                configuration,
+                isSelected: .constant(false),
+                isEnabled: false
+              )
+            }
+          }
+        }
+
+        if !relatedDataItems.isEmpty {
           Section("Related Data") {
-            ForEach(currentRecord.residues) { residue in
+            ForEach(relatedDataItems) { residue in
               removalRow(
                 residue,
                 isSelected: residueBinding(residue),
@@ -290,14 +405,23 @@ private struct ApplicationUninstallView: View {
 
       Divider()
       HStack(spacing: 12) {
-        Text("\(selectedItems.count) items · \(DisplayFormat.bytes(selectedItems.reduce(0) { $0 + $1.size }))")
+        Text(localized(
+          "%lld files · %lld startup configurations · %@",
+          Int64(selectedItems.count),
+          Int64(selectedStartupConfigurations.count),
+          DisplayFormat.bytes(selectedItems.reduce(0) { $0 + $1.size })
+        ))
           .font(.subheadline)
           .foregroundStyle(.secondary)
           .monospacedDigit()
         Spacer()
         Button("Cancel", role: .cancel) { dismiss() }
         Button("Uninstall", role: .destructive) {
-          store.uninstall(currentRecord, selectedIDs: selectedIDs)
+          store.uninstall(
+            currentRecord,
+            selectedIDs: selectedIDs,
+            selectedStartupConfigurationIDs: selectedStartupConfigurationIDs
+          )
           dismiss()
         }
         .keyboardShortcut(.defaultAction)
@@ -309,6 +433,7 @@ private struct ApplicationUninstallView: View {
     .onChange(of: allCopiesSelected) { allSelected in
       if !allSelected {
         selectedIDs.subtract(currentRecord.residues.map(\.id))
+        selectedStartupConfigurationIDs.subtract(currentRecord.startupConfigurations.map(\.id))
       }
     }
   }
@@ -321,13 +446,13 @@ private struct ApplicationUninstallView: View {
     HStack(spacing: 10) {
       SelectionCheckbox(isSelected: isSelected, isEnabled: isEnabled)
         .frame(width: 22)
-      Image(systemName: item.kind == .application ? "app" : "doc")
+      Image(systemName: removalIcon(for: item.kind))
         .foregroundStyle(.secondary)
         .frame(width: 18)
       VStack(alignment: .leading, spacing: 2) {
         HStack {
           Text(
-            item.kind == .application
+            item.kind == .application || item.kind == .startupItem
               ? LocalizedStringKey(item.name)
               : LocalizedStringKey(item.category)
           )
@@ -371,5 +496,102 @@ private struct ApplicationUninstallView: View {
         if selected { selectedIDs.insert(item.id) } else { selectedIDs.remove(item.id) }
       }
     )
+  }
+
+  private func startupConfigurationBinding(
+    _ configuration: ApplicationStartupConfiguration
+  ) -> Binding<Bool> {
+    Binding(
+      get: { selectedStartupConfigurationIDs.contains(configuration.id) },
+      set: { selected in
+        guard allCopiesSelected, configuration.canRemove else { return }
+        if selected {
+          selectedStartupConfigurationIDs.insert(configuration.id)
+        } else {
+          selectedStartupConfigurationIDs.remove(configuration.id)
+        }
+      }
+    )
+  }
+
+  private func startupConfigurationRow(
+    _ configuration: ApplicationStartupConfiguration,
+    isSelected: Binding<Bool>,
+    isEnabled: Bool
+  ) -> some View {
+    HStack(spacing: 10) {
+      SelectionCheckbox(isSelected: isSelected, isEnabled: isEnabled)
+        .frame(width: 22)
+      Image(systemName: configuration.source.systemImage)
+        .foregroundStyle(.secondary)
+        .frame(width: 18)
+      VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 7) {
+          Text(verbatim: configuration.name)
+            .lineLimit(1)
+          Text(configuration.isShared ? "Shared" : configuration.confidence.title)
+            .font(.caption2)
+            .foregroundStyle(configuration.isShared ? Color.secondary : Color.blue)
+        }
+        Text(LocalizedStringKey(configuration.evidence))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+        if let targetPath = configuration.targetPath {
+          Text(verbatim: targetPath)
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .help(targetPath)
+        }
+      }
+      Spacer()
+      Text(configuration.source.title)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+    .padding(.vertical, 3)
+  }
+
+  private func removalIcon(for kind: MaintenanceItemKind) -> String {
+    switch kind {
+    case .application: "app"
+    case .startupItem: "power"
+    default: "doc"
+    }
+  }
+
+  private func localized(_ key: String, _ arguments: CVarArg...) -> String {
+    AppLocalization.string(key, language: settings.language, arguments: arguments)
+  }
+}
+
+private extension StartupConfigurationSource {
+  var title: LocalizedStringKey {
+    switch self {
+    case .loginItem: "Open at Login"
+    case .userLaunchAgent: "User Launch Agent"
+    case .globalLaunchAgent: "Global Launch Agent"
+    case .systemDaemon: "System Service"
+    }
+  }
+
+  var systemImage: String {
+    switch self {
+    case .loginItem: "person.crop.circle.badge.clock"
+    case .userLaunchAgent: "person.crop.circle"
+    case .globalLaunchAgent: "person.2.circle"
+    case .systemDaemon: "gearshape.2"
+    }
+  }
+}
+
+private extension StartupAssociationConfidence {
+  var title: LocalizedStringKey {
+    switch self {
+    case .confirmed: "Confirmed"
+    case .likely: "Possible Match"
+    }
   }
 }

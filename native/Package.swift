@@ -22,6 +22,7 @@ let package = Package(
       linkerSettings: [
         .linkedFramework("CoreWLAN"),
         .linkedFramework("IOKit"),
+        .linkedFramework("Security"),
         .linkedFramework("ServiceManagement"),
       ]
     ),

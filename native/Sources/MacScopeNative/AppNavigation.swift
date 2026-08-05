@@ -5,9 +5,12 @@ import SwiftUI
 
 enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   case overview
+  case performancePower
+  case processes
   case systemInfo
   case battery
   case ports
+  case startupItems
   case downloads
   case junk
   case applications
@@ -20,9 +23,12 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   var title: LocalizedStringKey {
     switch self {
     case .overview: "Overview"
+    case .performancePower: "Performance & Power"
+    case .processes: "Process Management"
     case .systemInfo: "System Information"
     case .battery: "Battery Health"
     case .ports: "Ports"
+    case .startupItems: "Startup Items"
     case .downloads: "Downloads Cleanup"
     case .junk: "Junk Cleanup"
     case .applications: "Applications"
@@ -32,12 +38,46 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     }
   }
 
+  var pageDescription: LocalizedStringKey {
+    switch self {
+    case .overview:
+      "Live CPU, memory, disk, and network activity."
+    case .performancePower:
+      "Real-time CPU, power, temperature, and cooling activity."
+    case .processes:
+      "Inspect, group, and manage running processes and software."
+    case .systemInfo:
+      "Hardware, storage, displays, and connected devices on this Mac."
+    case .battery:
+      "Charge, capacity, cycle count, temperature, and electrical condition."
+    case .ports:
+      "Listening ports and the processes and software using them."
+    case .startupItems:
+      "Open at Login items, background tasks, and startup remnants."
+    case .downloads:
+      "Installers, archives, and older files in your Downloads folder."
+    case .junk:
+      "Caches, logs, diagnostics, and developer data."
+    case .applications:
+      "Installed applications and their related data."
+    case .largeFiles:
+      "Files above the size threshold in your selected folders."
+    case .duplicates:
+      "Byte-for-byte matches in your selected folders."
+    case .memory:
+      "Current memory pressure and inactive file cache."
+    }
+  }
+
   var systemImage: String {
     switch self {
     case .overview: "gauge.with.dots.needle.50percent"
+    case .performancePower: "bolt.circle"
+    case .processes: "list.bullet.rectangle"
     case .systemInfo: "desktopcomputer"
     case .battery: "battery.100percent"
     case .ports: "network"
+    case .startupItems: "power"
     case .downloads: "arrow.down.circle"
     case .junk: "trash"
     case .applications: "app.dashed"
@@ -51,12 +91,18 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .overview:
       Color(nsColor: .black)
+    case .performancePower:
+      Color(nsColor: .systemOrange)
+    case .processes:
+      Color(nsColor: .systemGray)
     case .systemInfo:
       Color(nsColor: .systemGray)
     case .battery, .memory:
       Color(nsColor: .systemGreen)
     case .ports:
       Color(nsColor: .systemBlue)
+    case .startupItems:
+      Color(nsColor: .systemGray)
     case .downloads, .junk, .largeFiles, .duplicates:
       Color(nsColor: .systemRed)
     case .applications:
@@ -88,7 +134,7 @@ final class AppNavigation: ObservableObject {
   }
 
   func inspectProcess(_ pid: Int32) {
-    destination = .overview
+    destination = .processes
     processInspectionRequest = ProcessInspectionRequest(pid: pid)
   }
 

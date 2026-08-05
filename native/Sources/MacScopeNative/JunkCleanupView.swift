@@ -18,58 +18,57 @@ struct JunkCleanupView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolHeader(
-        "Junk Cleanup",
-        subtitle: "Caches, logs, diagnostics, and developer data."
-      ) {
-        if !store.junkItems.isEmpty {
-          Button(action: store.scanJunk) {
-            Label("Scan", systemImage: "arrow.clockwise")
-          }
-          .disabled(store.isBusy)
-        }
-      }
-      Divider()
+      SystemToolPageHeader(destination: .junk)
 
-      if store.activity?.tool == .junk {
-        MaintenanceActivityInlineView(tool: .junk)
-        Divider()
-      }
-
-      if store.junkItems.isEmpty, store.activity?.tool == .junk, store.isBusy {
-        Spacer()
-      } else if store.junkItems.isEmpty {
-        SystemToolEmptyView(
-          systemImage: store.scannedTools.contains(.junk) ? "checkmark.circle" : "trash",
-          title: store.scannedTools.contains(.junk) ? "No Junk Found" : "Ready to Scan",
-          message: store.scannedTools.contains(.junk)
-            ? "The selected locations do not contain removable items."
-            : "Scan common user-library locations for removable files."
-        ) {
-          Button(action: store.scanJunk) {
-            Label("Scan for Junk", systemImage: "magnifyingglass")
-          }
-          .buttonStyle(.borderedProminent)
-          .disabled(store.isBusy)
-        }
+      if store.junkItems.isEmpty, store.activity?.tool == .junk {
+        MaintenanceActivityProminentView(tool: .junk)
       } else {
-        selectionBar
-        Divider()
-        junkTable
-        Divider()
-        SystemToolStatusBar(
-          summary: localized(
-            "%lld selected · %@",
-            Int64(selectedItems.count),
-            DisplayFormat.bytes(selectedSize)
-          )
-        ) {
-          Button("Clean Selected", role: .destructive, action: requestCleanup)
-            .disabled(selectedItems.isEmpty || store.isBusy)
+        if store.activity?.tool == .junk {
+          MaintenanceActivityInlineView(tool: .junk)
+          Divider()
+        }
+
+        if store.junkItems.isEmpty {
+          SystemToolEmptyView(
+            systemImage: store.scannedTools.contains(.junk) ? "checkmark.circle" : "trash",
+            title: store.scannedTools.contains(.junk) ? "No Junk Found" : "Ready to Scan",
+            message: store.scannedTools.contains(.junk)
+              ? "The selected locations do not contain removable items."
+              : "Scan common user-library locations for removable files."
+          ) {
+            Button(action: store.scanJunk) {
+              Label("Scan for Junk", systemImage: "magnifyingglass")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(store.isBusy)
+          }
+        } else {
+          selectionBar
+          Divider()
+          junkTable
+          Divider()
+          SystemToolStatusBar(
+            summary: localized(
+              "%lld selected · %@",
+              Int64(selectedItems.count),
+              DisplayFormat.bytes(selectedSize)
+            )
+          ) {
+            Button("Clean Selected", role: .destructive, action: requestCleanup)
+              .disabled(selectedItems.isEmpty || store.isBusy)
+          }
         }
       }
     }
-    .navigationTitle(AppLocalization.string("Junk Cleanup", language: settings.language))
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button(action: store.scanJunk) {
+          Label("Scan", systemImage: "arrow.clockwise")
+        }
+        .help("Scan for Junk")
+        .disabled(store.isBusy)
+      }
+    }
     .onAppear(perform: synchronizeSelection)
     .onChange(of: store.junkItems.map(\.id)) { _ in synchronizeSelection() }
     .alert(cleanupTitle, isPresented: $confirmsCleanup) {

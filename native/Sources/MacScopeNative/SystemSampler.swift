@@ -45,6 +45,9 @@ actor SystemSampler {
   private var temperatureUpdatedAt = -TimeInterval.infinity
   private var power = PowerUsage.unavailable
   private var powerUpdatedAt = -TimeInterval.infinity
+  private let smcReader = SMCReader()
+  private var cooling = CoolingUsage.unavailable
+  private var coolingUpdatedAt = -TimeInterval.infinity
 
   func sampleMetrics() -> SystemSnapshot {
     let now = ProcessInfo.processInfo.systemUptime
@@ -56,6 +59,11 @@ actor SystemSampler {
     if now - powerUpdatedAt >= 1 {
       power = PowerMetricsReader.read()
       powerUpdatedAt = now
+    }
+    let coolingInterval: TimeInterval = cooling.state == .available ? 2 : 30
+    if now - coolingUpdatedAt >= coolingInterval {
+      cooling = smcReader.readCoolingUsage()
+      coolingUpdatedAt = now
     }
     let cpuTicks = readCPUTicks()
     let diskCounters = readDiskCounters()
@@ -105,6 +113,7 @@ actor SystemSampler {
       disk: disk,
       network: network,
       power: power,
+      cooling: cooling,
       processes: []
     )
   }
@@ -199,15 +208,14 @@ actor SystemSampler {
   }
 
   private func readDiskCapacity() -> (used: UInt64, available: UInt64, total: UInt64) {
-    let keys: Set<URLResourceKey> = [
-      .volumeTotalCapacityKey,
-      .volumeAvailableCapacityForImportantUsageKey,
-    ]
-    guard let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys) else {
+    var statistics = statvfs()
+    guard statvfs("/", &statistics) == 0 else {
       return (0, 0, 0)
     }
-    let total = UInt64(max(0, values.volumeTotalCapacity ?? 0))
-    let available = UInt64(max(0, values.volumeAvailableCapacityForImportantUsage ?? 0))
+
+    let blockSize = UInt64(statistics.f_frsize)
+    let total = UInt64(statistics.f_blocks) * blockSize
+    let available = UInt64(statistics.f_bavail) * blockSize
     return (total - min(total, available), available, total)
   }
 

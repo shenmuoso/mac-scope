@@ -42,6 +42,16 @@ enum DisplayFormat {
     return String(format: watts < 100 ? "%.1fW" : "%.0fW", watts)
   }
 
+  static func fanSpeed(_ rpm: Double?) -> String? {
+    guard let rpm, rpm.isFinite, rpm >= 0 else { return nil }
+    return "\(Int(rpm.rounded())) RPM"
+  }
+
+  static func compactFanSpeed(_ rpm: Double?) -> String {
+    guard let rpm, rpm.isFinite, rpm >= 0 else { return "--" }
+    return "\(Int(rpm.rounded()))RPM"
+  }
+
   static func temperature(_ celsius: Double?, unit: TemperatureUnit) -> String? {
     guard let celsius, celsius.isFinite else { return nil }
     switch unit {

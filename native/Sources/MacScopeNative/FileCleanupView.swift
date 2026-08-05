@@ -27,43 +27,45 @@ struct FileCleanupView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolHeader(pageTitle, subtitle: pageSubtitle) {
-        if !items.isEmpty {
-          Button(action: scan) {
-            Label("Scan", systemImage: "arrow.clockwise")
-          }
-          .disabled(store.isBusy)
-        }
-      }
-      Divider()
+      SystemToolPageHeader(destination: isDuplicateMode ? .duplicates : .largeFiles)
 
-      if store.activity?.tool == tool {
-        MaintenanceActivityInlineView(tool: tool)
-        Divider()
-      }
-
-      if items.isEmpty, store.activity?.tool == tool, store.isBusy {
-        Spacer()
-      } else if items.isEmpty {
-        emptyState
+      if items.isEmpty, store.activity?.tool == tool {
+        MaintenanceActivityProminentView(tool: tool)
       } else {
-        selectionBar
-        Divider()
-        fileTable
-        Divider()
-        SystemToolStatusBar(
-          summary: localized(
-            "%lld selected · %@",
-            Int64(selectedItems.count),
-            DisplayFormat.bytes(selectedSize)
-          )
-        ) {
-          Button("Move to Trash", role: .destructive, action: requestRemoval)
-            .disabled(selectedItems.isEmpty || store.isBusy)
+        if store.activity?.tool == tool {
+          MaintenanceActivityInlineView(tool: tool)
+          Divider()
+        }
+
+        if items.isEmpty {
+          emptyState
+        } else {
+          selectionBar
+          Divider()
+          fileTable
+          Divider()
+          SystemToolStatusBar(
+            summary: localized(
+              "%lld selected · %@",
+              Int64(selectedItems.count),
+              DisplayFormat.bytes(selectedSize)
+            )
+          ) {
+            Button("Move to Trash", role: .destructive, action: requestRemoval)
+              .disabled(selectedItems.isEmpty || store.isBusy)
+          }
         }
       }
     }
-    .navigationTitle(AppLocalization.string(pageTitleKey, language: settings.language))
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button(action: scan) {
+          Label("Scan", systemImage: "arrow.clockwise")
+        }
+        .help(isDuplicateMode ? "Find Duplicates" : "Find Large Files")
+        .disabled(store.isBusy)
+      }
+    }
     .onAppear(perform: synchronizeSelection)
     .onChange(of: items.map(\.id)) { _ in synchronizeSelection() }
     .alert("Move the selected files to Trash?", isPresented: $confirmsRemoval) {
@@ -72,20 +74,6 @@ struct FileCleanupView: View {
     } message: {
       Text("You can restore these files from Trash until it is emptied.")
     }
-  }
-
-  private var pageTitle: LocalizedStringKey {
-    isDuplicateMode ? "Duplicates" : "Large Files"
-  }
-
-  private var pageTitleKey: String {
-    isDuplicateMode ? "Duplicates" : "Large Files"
-  }
-
-  private var pageSubtitle: LocalizedStringKey {
-    isDuplicateMode
-      ? "Byte-for-byte matches in your selected folders."
-      : "Files above the size threshold in your selected folders."
   }
 
   @ViewBuilder

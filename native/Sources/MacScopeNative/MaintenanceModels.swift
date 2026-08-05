@@ -17,6 +17,7 @@ enum MaintenanceItemKind: String, Codable, Sendable {
   case diagnostic
   case developer
   case application
+  case startupItem
   case residue
   case largeFile
   case duplicate
@@ -70,6 +71,8 @@ struct ApplicationRecord: Identifiable, Hashable, Sendable {
   let application: MaintenanceItem
   let bundleIdentifier: String
   let version: String
+  let startupConfigurations: [ApplicationStartupConfiguration]
+  let loginItemsAccess: LoginItemsAccessState
   let residues: [MaintenanceItem]
   let otherCopies: [MaintenanceItem]
   let isRunning: Bool
@@ -86,6 +89,8 @@ struct ApplicationRecord: Identifiable, Hashable, Sendable {
       application: application,
       bundleIdentifier: bundleIdentifier,
       version: version,
+      startupConfigurations: startupConfigurations,
+      loginItemsAccess: loginItemsAccess,
       residues: residues,
       otherCopies: otherCopies,
       isRunning: isRunning

@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import Darwin
 import Foundation
 
 actor MaintenanceService {
@@ -82,7 +83,12 @@ actor MaintenanceService {
     let currentApplicationPath = await MainActor.run {
       Bundle.main.bundleURL.standardizedFileURL.path
     }
-    var applications: [(item: MaintenanceItem, bundleID: String, version: String)] = []
+    var applications: [(
+      item: MaintenanceItem,
+      bundleID: String,
+      version: String,
+      teamIdentifier: String?
+    )] = []
     var issues: [ScanIssue] = []
     var scanned = 0
 
@@ -120,7 +126,8 @@ actor MaintenanceService {
                       group: metadata.bundleID
                     ),
                     metadata.bundleID,
-                    metadata.version
+                    metadata.version,
+                    StartupItemCodeSignature.teamIdentifier(at: child)
                   ))
                 await progress(ScanProgress(scannedCount: scanned, currentPath: child.path))
               } catch is CancellationError {
@@ -143,6 +150,16 @@ actor MaintenanceService {
     let grouped = Dictionary(grouping: applications) { application in
       application.bundleID.isEmpty ? application.item.id : application.bundleID
     }
+    let startupApplications = applications.map { application in
+      return StartupItemApplication(
+        name: application.item.name,
+        bundleIdentifier: application.bundleID,
+        url: application.item.url,
+        teamIdentifier: application.teamIdentifier
+      )
+    }
+    let startupScan = await StartupItemService()
+      .scan(applications: startupApplications)
     var records: [ApplicationRecord] = []
     records.reserveCapacity(grouped.count)
     for group in grouped.values {
@@ -162,11 +179,23 @@ actor MaintenanceService {
       let copies = orderedCopies.dropFirst().map(\.item)
       let installedPaths = Set(orderedCopies.map { $0.item.url.standardizedFileURL.path })
       let isRunning = runningPaths.contains { installedPaths.contains($0) }
+      let startupConfigurations = applicationStartupConfigurations(
+        applicationName: application.item.name,
+        bundleIdentifier: application.bundleID,
+        teamIdentifier: application.teamIdentifier,
+        installedPaths: installedPaths,
+        parentID: application.item.id,
+        allApplications: startupApplications,
+        loginItems: startupScan.loginItems,
+        backgroundItems: startupScan.backgroundItems
+      )
       records.append(
         ApplicationRecord(
           application: application.item,
           bundleIdentifier: application.bundleID,
           version: application.version,
+          startupConfigurations: startupConfigurations,
+          loginItemsAccess: startupScan.loginItemsAccess,
           residues: residueResult.items,
           otherCopies: copies,
           isRunning: isRunning
@@ -176,6 +205,189 @@ actor MaintenanceService {
       $0.application.name.localizedStandardCompare($1.application.name) == .orderedAscending
     }
     return ScanResult(values: records, issues: uniqueIssues(issues), scannedCount: scanned)
+  }
+
+  private func applicationStartupConfigurations(
+    applicationName: String,
+    bundleIdentifier: String,
+    teamIdentifier: String?,
+    installedPaths: Set<String>,
+    parentID: String,
+    allApplications: [StartupItemApplication],
+    loginItems: [SystemLoginItem],
+    backgroundItems: [StartupItem]
+  ) -> [ApplicationStartupConfiguration] {
+    let matchingNameBundleIDs = Set(
+      allApplications.filter {
+        $0.name.compare(
+          applicationName,
+          options: [.caseInsensitive, .diacriticInsensitive]
+        ) == .orderedSame
+      }.map(\.bundleIdentifier).filter { !$0.isEmpty }
+    )
+    let teamBundleIDs = Set(
+      allApplications.filter {
+        teamIdentifier != nil && $0.teamIdentifier == teamIdentifier
+      }.map(\.bundleIdentifier).filter { !$0.isEmpty }
+    )
+    let privilegedHelperLabels = installedPaths.reduce(into: Set<String>()) { labels, path in
+      guard let values = Bundle(url: URL(fileURLWithPath: path))?
+        .object(forInfoDictionaryKey: "SMPrivilegedExecutables") as? [String: Any]
+      else { return }
+      labels.formUnion(values.keys)
+    }
+    let privilegedHelperOwners = allApplications.reduce(
+      into: [String: Set<String>]()
+    ) { owners, application in
+      guard let values = Bundle(url: application.url)?
+        .object(forInfoDictionaryKey: "SMPrivilegedExecutables") as? [String: Any]
+      else { return }
+      let ownerID = application.bundleIdentifier.isEmpty
+        ? application.url.standardizedFileURL.path
+        : application.bundleIdentifier
+      for label in values.keys {
+        owners[label, default: []].insert(ownerID)
+      }
+    }
+
+    var configurations: [ApplicationStartupConfiguration] = []
+    for item in loginItems {
+      let pathMatches = item.targetURL.map { target in
+        installedPaths.contains { applicationPath in
+          target.path == applicationPath || target.path.hasPrefix(applicationPath + "/")
+        }
+      } ?? false
+      let nameMatches = item.path == nil
+        && item.name.compare(
+          applicationName,
+          options: [.caseInsensitive, .diacriticInsensitive]
+        ) == .orderedSame
+      guard pathMatches || nameMatches else { continue }
+
+      let confidence: StartupAssociationConfidence = pathMatches ? .confirmed : .likely
+      let shared = !pathMatches && matchingNameBundleIDs.count > 1
+      configurations.append(
+        ApplicationStartupConfiguration(
+          id: "association:\(item.id)",
+          name: item.name,
+          source: .loginItem,
+          targetPath: item.path,
+          loginItem: item,
+          launchItem: nil,
+          cleanupItems: [],
+          confidence: confidence,
+          evidence: pathMatches
+            ? "Login item target matches the application path."
+            : "Login item name matches, but macOS did not report its target path.",
+          isShared: shared,
+          isDefaultSelected: pathMatches && !shared
+        ))
+    }
+
+    for item in backgroundItems {
+      let executablePath = item.executableURL?.standardizedFileURL.path
+      let pathMatches = executablePath.map { executablePath in
+        installedPaths.contains { applicationPath in
+          executablePath == applicationPath || executablePath.hasPrefix(applicationPath + "/")
+        }
+      } ?? false
+      let bundleMatches = !bundleIdentifier.isEmpty
+        && item.requestedBundleIdentifier == bundleIdentifier
+      let privilegedHelperMatches = privilegedHelperLabels.contains(item.label)
+      let labelMatches = !bundleIdentifier.isEmpty
+        && (item.label == bundleIdentifier || item.label.hasPrefix(bundleIdentifier + "."))
+      let teamMatches = teamIdentifier != nil
+        && item.executableTeamIdentifier == teamIdentifier
+      guard pathMatches || bundleMatches || privilegedHelperMatches || labelMatches || teamMatches
+      else { continue }
+
+      let confirmed = pathMatches || bundleMatches || privilegedHelperMatches
+      let teamOnly = teamMatches && !confirmed && !labelMatches
+      let helperShared = privilegedHelperMatches
+        && privilegedHelperOwners[item.label, default: []].count > 1
+      let shared = helperShared || (teamOnly && teamBundleIDs.count > 1)
+      let evidence: String
+      if helperShared {
+        evidence = "This signed background component may be shared by multiple installed applications."
+      } else if pathMatches {
+        evidence = "Background task executable is inside the application."
+      } else if bundleMatches {
+        evidence = "Background task opens this exact application identifier."
+      } else if privilegedHelperMatches {
+        evidence = "The application explicitly declares this privileged helper."
+      } else if labelMatches {
+        evidence = "Background task label begins with the application identifier."
+      } else {
+        evidence = shared
+          ? "This signed background component may be shared by multiple installed applications."
+          : "Background task and application use the same signing team."
+      }
+
+      var cleanupItems: [MaintenanceItem] = []
+      if let identity = try? fileIdentity(item.plistURL) {
+        cleanupItems.append(
+          makeItem(
+            kind: .startupItem,
+            category: "Startup Item",
+            name: item.label,
+            url: item.plistURL,
+            size: identity.size,
+            identity: identity,
+            group: bundleIdentifier,
+            parentID: parentID
+          ))
+      }
+      if privilegedHelperMatches, !shared,
+        let executableURL = item.executableURL,
+        executableURL.standardizedFileURL.path.hasPrefix("/Library/PrivilegedHelperTools/"),
+        executableURL.lastPathComponent == item.label,
+        let teamIdentifier,
+        item.executableTeamIdentifier == teamIdentifier,
+        let identity = try? fileIdentity(executableURL)
+      {
+        cleanupItems.append(
+          makeItem(
+            kind: .startupItem,
+            category: "Privileged Helper",
+            name: executableURL.lastPathComponent,
+            url: executableURL,
+            size: identity.size,
+            identity: identity,
+            group: bundleIdentifier,
+            parentID: parentID
+          ))
+      }
+      configurations.append(
+        ApplicationStartupConfiguration(
+          id: "association:launchd:\(item.id)",
+          name: item.label,
+          source: startupConfigurationSource(for: item.kind),
+          targetPath: item.executableURL?.path,
+          loginItem: nil,
+          launchItem: item,
+          cleanupItems: cleanupItems,
+          confidence: confirmed ? .confirmed : .likely,
+          evidence: evidence,
+          isShared: shared,
+          isDefaultSelected: confirmed && !shared && !cleanupItems.isEmpty
+        ))
+    }
+
+    return configurations.sorted { lhs, rhs in
+      if lhs.isShared != rhs.isShared { return !lhs.isShared }
+      if lhs.confidence != rhs.confidence { return lhs.confidence == .confirmed }
+      return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+    }
+  }
+
+  private func startupConfigurationSource(
+    for kind: StartupItemKind
+  ) -> StartupConfigurationSource {
+    switch kind {
+    case .userAgent: .userLaunchAgent
+    case .globalAgent: .globalLaunchAgent
+    case .daemon: .systemDaemon
+    }
   }
 
   func scanLargeFiles(
@@ -474,19 +686,118 @@ actor MaintenanceService {
     progress: CleanupReporter
   ) async -> CleanupResult {
     let ordered = items.enumerated().sorted { lhs, rhs in
-      let lhsRank = lhs.element.kind == .application ? 0 : 1
-      let rhsRank = rhs.element.kind == .application ? 0 : 1
+      let lhsRank = cleanupRank(lhs.element)
+      let rhsRank = cleanupRank(rhs.element)
       return lhsRank == rhsRank ? lhs.offset < rhs.offset : lhsRank < rhsRank
     }.map(\.element)
     var completedItems: [MaintenanceItem] = []
     var failures: [MaintenanceFailure] = []
     var handledBytes: UInt64 = 0
+    var processedCount = 0
+    var handledAuthorizedIDs = Set<MaintenanceItem.ID>()
 
-    for (offset, item) in ordered.enumerated() {
+    for item in ordered {
       if Task.isCancelled { break }
+      if handledAuthorizedIDs.contains(item.id) { continue }
+
+      if authorize, requiresAdministratorRemoval(item) {
+        let candidates = ordered.filter {
+          !handledAuthorizedIDs.contains($0.id) && requiresAdministratorRemoval($0)
+        }
+        handledAuthorizedIDs.formUnion(candidates.map(\.id))
+        var authorizedItems: [MaintenanceItem] = []
+        for candidate in candidates {
+          do {
+            try validate(candidate, allowedRoots: allowedRoots)
+            if candidate.kind == .application, await applicationIsRunning(candidate.url) {
+              throw MaintenanceServiceError.running
+            }
+            authorizedItems.append(candidate)
+          } catch {
+            let failure = classifyFailure(item: candidate, error: error)
+            failures.append(failure)
+            processedCount += 1
+            await progress(
+              CleanupProgress(
+                completed: processedCount,
+                total: ordered.count,
+                item: candidate,
+                state: .failed,
+                detail: failure.detail
+              ))
+          }
+        }
+        guard !authorizedItems.isEmpty else { continue }
+
+        await progress(
+          CleanupProgress(
+            completed: processedCount,
+            total: ordered.count,
+            item: authorizedItems[0],
+            state: .working,
+            detail: ""
+          ))
+        let authorizationResult = SystemPermission
+          .moveItemsToTrashWithAdministratorAuthorization(
+            authorizedItems.map(administratorTrashItem(for:))
+          )
+        switch authorizationResult {
+        case .success:
+          for candidate in authorizedItems {
+            if candidate.kind == .application {
+              SystemPermission.unregisterApplication(at: candidate.url)
+            }
+            completedItems.append(candidate)
+            handledBytes += candidate.size
+            processedCount += 1
+            await progress(
+              CleanupProgress(
+                completed: processedCount,
+                total: ordered.count,
+                item: candidate,
+                state: .completed,
+                detail: "Moved to Trash"
+              ))
+          }
+        case .cancelled:
+          await progress(
+            CleanupProgress(
+              completed: processedCount,
+              total: ordered.count,
+              item: authorizedItems[0],
+              state: .failed,
+              detail: "Cancelled"
+            ))
+          return CleanupResult(
+            completed: completedItems,
+            failures: failures,
+            reclaimedBytes: handledBytes,
+            authorizationCancelled: true
+          )
+        case .failure(let message):
+          for candidate in authorizedItems {
+            let failure = classifyFailure(
+              item: candidate,
+              error: MaintenanceServiceError.administratorAuthorizationFailed(message)
+            )
+            failures.append(failure)
+            processedCount += 1
+            await progress(
+              CleanupProgress(
+                completed: processedCount,
+                total: ordered.count,
+                item: candidate,
+                state: .failed,
+                detail: failure.detail
+              ))
+          }
+        }
+        continue
+      }
+
       await progress(
         CleanupProgress(
-          completed: offset,
+          completed: processedCount,
           total: ordered.count,
           item: item,
           state: .working,
@@ -501,32 +812,11 @@ actor MaintenanceService {
         let permanentlyDelete =
           cacheMode == .delete
           && (item.kind == .cache || item.kind == .developer)
+        if item.kind == .startupItem, item.url.pathExtension == "plist" {
+          stopStartupItem(at: item.url)
+        }
         if permanentlyDelete {
           try fileManager.removeItem(at: item.url)
-        } else if authorize, item.kind == .application,
-          item.url.standardizedFileURL.path.hasPrefix("/Applications/")
-        {
-          switch SystemPermission.moveToTrashWithAdministratorAuthorization(item.url) {
-          case .success:
-            break
-          case .cancelled:
-            await progress(
-              CleanupProgress(
-                completed: offset,
-                total: ordered.count,
-                item: item,
-                state: .failed,
-                detail: "Cancelled"
-              ))
-            return CleanupResult(
-              completed: completedItems,
-              failures: failures,
-              reclaimedBytes: handledBytes,
-              authorizationCancelled: true
-            )
-          case .failure(let message):
-            throw MaintenanceServiceError.administratorAuthorizationFailed(message)
-          }
         } else {
           try fileManager.trashItem(at: item.url, resultingItemURL: nil)
         }
@@ -535,9 +825,10 @@ actor MaintenanceService {
         }
         completedItems.append(item)
         handledBytes += item.size
+        processedCount += 1
         await progress(
           CleanupProgress(
-            completed: offset + 1,
+            completed: processedCount,
             total: ordered.count,
             item: item,
             state: .completed,
@@ -546,9 +837,10 @@ actor MaintenanceService {
       } catch {
         let failure = classifyFailure(item: item, error: error)
         failures.append(failure)
+        processedCount += 1
         await progress(
           CleanupProgress(
-            completed: offset + 1,
+            completed: processedCount,
             total: ordered.count,
             item: item,
             state: .failed,
@@ -562,6 +854,96 @@ actor MaintenanceService {
       reclaimedBytes: handledBytes,
       authorizationCancelled: false
     )
+  }
+
+  func preflightCleanup(
+    items: [MaintenanceItem],
+    allowedRoots: [URL]
+  ) async -> [MaintenanceFailure] {
+    var failures: [MaintenanceFailure] = []
+    for item in items {
+      do {
+        try validate(item, allowedRoots: allowedRoots)
+        if item.kind == .application, await applicationIsRunning(item.url) {
+          throw MaintenanceServiceError.running
+        }
+      } catch {
+        failures.append(classifyFailure(item: item, error: error))
+      }
+    }
+    return failures
+  }
+
+  private func cleanupRank(_ item: MaintenanceItem) -> Int {
+    switch item.kind {
+    case .startupItem:
+      return requiresAdministratorRemoval(item) ? 1 : 0
+    case .application:
+      return 2
+    default:
+      return 3
+    }
+  }
+
+  private func requiresAdministratorRemoval(_ item: MaintenanceItem) -> Bool {
+    let path = item.url.standardizedFileURL.path
+    if item.kind == .application {
+      return path.hasPrefix("/Applications/")
+    }
+    guard item.kind == .startupItem else { return false }
+    return path.hasPrefix("/Library/LaunchAgents/")
+      || path.hasPrefix("/Library/LaunchDaemons/")
+      || path.hasPrefix("/Library/PrivilegedHelperTools/")
+  }
+
+  private func administratorTrashItem(for item: MaintenanceItem) -> AdministratorTrashItem {
+    AdministratorTrashItem(
+      source: item.url,
+      serviceTarget: item.kind == .startupItem && item.url.pathExtension == "plist"
+        ? startupServiceTarget(at: item.url)
+        : nil
+    )
+  }
+
+  private func stopStartupItem(at url: URL) {
+    guard let target = startupServiceTarget(at: url) else { return }
+    _ = runLaunchctl(["bootout", target])
+    _ = runLaunchctl(["enable", target])
+  }
+
+  private func startupServiceTarget(at url: URL) -> String? {
+    guard let data = try? Data(contentsOf: url),
+      let propertyList = try? PropertyListSerialization.propertyList(
+        from: data,
+        options: [],
+        format: nil
+      ),
+      let dictionary = propertyList as? [String: Any],
+      let label = dictionary["Label"] as? String,
+      !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      return nil
+    }
+    let path = url.standardizedFileURL.path
+    let domain = path.hasPrefix("/Library/LaunchDaemons/")
+      ? "system"
+      : "gui/\(getuid())"
+    return "\(domain)/\(label)"
+  }
+
+  private func runLaunchctl(_ arguments: [String]) -> Bool {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+    process.arguments = arguments
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    do {
+      try process.run()
+      process.waitUntilExit()
+      return process.terminationStatus == 0
+    } catch {
+      return false
+    }
   }
 
   func releaseMemory() -> MemoryReleaseResult {

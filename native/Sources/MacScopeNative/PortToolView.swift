@@ -3,7 +3,6 @@ import Darwin
 import SwiftUI
 
 struct PortToolView: View {
-  @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var navigation: AppNavigation
   @EnvironmentObject private var settings: AppSettings
   @StateObject private var store = PortInfoStore()
@@ -35,6 +34,8 @@ struct PortToolView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      SystemToolPageHeader(destination: .ports)
+
       if store.isLoading && store.records.isEmpty {
         ProgressView("Reading Listening Ports")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -86,7 +87,6 @@ struct PortToolView: View {
         .disabled(selectedRecord == nil)
       }
     }
-    .navigationTitle("Ports")
     .searchable(text: $searchText, prompt: "Search Ports and Software")
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
@@ -217,7 +217,6 @@ struct PortToolView: View {
 
   private func inspectProcess() {
     guard let selectedRecord else { return }
-    monitor.setProcessSampling(true, for: .overview)
     navigation.inspectProcess(selectedRecord.pid)
   }
 

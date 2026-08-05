@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct MacScopeRootView: View {
-  @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
 
@@ -11,13 +10,7 @@ struct MacScopeRootView: View {
       set: {
         let nextDestination = $0 ?? .overview
         guard navigation.destination != nextDestination else { return }
-        if navigation.destination == .overview {
-          monitor.setProcessSampling(false, for: .overview)
-        }
         navigation.destination = nextDestination
-        if nextDestination == .overview {
-          monitor.setProcessSampling(true, for: .overview)
-        }
       }
     )
   }
@@ -28,6 +21,8 @@ struct MacScopeRootView: View {
         List(selection: destinationSelection) {
           Section("Monitor") {
             sidebarRow(.overview)
+            sidebarRow(.performancePower)
+            sidebarRow(.processes)
           }
           Section("Hardware") {
             sidebarRow(.systemInfo)
@@ -35,6 +30,7 @@ struct MacScopeRootView: View {
           }
           Section("System Tools") {
             sidebarRow(.ports)
+            sidebarRow(.startupItems)
             sidebarRow(.downloads)
             sidebarRow(.junk)
             sidebarRow(.applications)
@@ -61,6 +57,7 @@ struct MacScopeRootView: View {
       .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
     } detail: {
       detailContent
+        .navigationTitle("")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
           Color(nsColor: .windowBackgroundColor)
@@ -83,12 +80,6 @@ struct MacScopeRootView: View {
           .help("Settings")
         }
       }
-    }
-    .onAppear {
-      monitor.setProcessSampling(navigation.destination == .overview, for: .overview)
-    }
-    .onDisappear {
-      monitor.setProcessSampling(false, for: .overview)
     }
   }
 
@@ -119,12 +110,18 @@ struct MacScopeRootView: View {
     switch navigation.destination {
     case .overview:
       DashboardView()
+    case .performancePower:
+      PerformancePowerView()
+    case .processes:
+      ProcessManagementView()
     case .systemInfo:
       HardwareInfoView()
     case .battery:
       BatteryHealthView()
     case .ports:
       PortToolView()
+    case .startupItems:
+      StartupItemsView()
     case .downloads:
       DownloadCleanupView()
     case .junk:

@@ -45,14 +45,6 @@ struct MaintenanceActivityInlineView: View {
             Text(statusText(for: activity))
               .font(.caption)
               .foregroundStyle(.secondary)
-
-            if shouldShowCurrentPath(for: activity) {
-              Text(activity.currentPath)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            }
           }
 
           Spacer(minLength: 16)
@@ -99,12 +91,26 @@ struct MaintenanceActivityInlineView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
 
-        if store.isBusy, let progress = activity.progress {
-          ProgressView(value: progress)
+        if store.isBusy {
+          Group {
+            if let progress = activity.progress {
+              ProgressView(value: min(1, max(0, progress)))
+            } else {
+              ProgressView()
+            }
+          }
+          .progressViewStyle(.linear)
+          .tint(.accentColor)
+          .padding(.horizontal, 16)
+
+          compactCurrentContext(activity)
+            .frame(height: 18)
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
         }
       }
+      .frame(maxWidth: 960)
+      .frame(maxWidth: .infinity)
       .background(.bar)
       .transition(.opacity)
       .sheet(isPresented: $showsResults) {
@@ -122,8 +128,9 @@ struct MaintenanceActivityInlineView: View {
   private func activityIcon(for activity: MaintenanceActivity) -> some View {
     switch activity.phase {
     case .scanning, .working:
-      ProgressView()
-        .controlSize(.small)
+      Image(systemName: operationSymbol(activity.operation))
+        .font(.system(size: 17, weight: .medium))
+        .foregroundStyle(.secondary)
     case .completed:
       Image(systemName: issueCount > 0 ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
         .font(.system(size: 18, weight: .medium))
@@ -133,6 +140,49 @@ struct MaintenanceActivityInlineView: View {
         .font(.system(size: 18, weight: .medium))
         .foregroundStyle(.secondary)
     }
+  }
+
+  @ViewBuilder
+  private func compactCurrentContext(_ activity: MaintenanceActivity) -> some View {
+    if shouldShowCurrentPath(for: activity) {
+      if let location = pathContext(activity.currentPath) {
+        HStack(spacing: 7) {
+          Image(systemName: "folder")
+            .foregroundStyle(.tertiary)
+          Text(location.name)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+          Text(location.parent)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .help(activity.currentPath)
+        }
+        .font(.caption)
+      } else {
+        Text(activity.currentPath)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+    }
+  }
+
+  private func operationSymbol(_ operation: MaintenanceOperationKind) -> String {
+    switch operation {
+    case .scan: "magnifyingglass"
+    case .cleanup: "trash"
+    case .memory: "memorychip"
+    }
+  }
+
+  private func pathContext(_ path: String) -> (name: String, parent: String)? {
+    guard path.hasPrefix("/") else { return nil }
+    let url = URL(fileURLWithPath: path)
+    let name = url.lastPathComponent
+    guard !name.isEmpty else { return nil }
+    return (name, url.deletingLastPathComponent().path)
   }
 
   private func statusText(for activity: MaintenanceActivity) -> String {
@@ -171,6 +221,303 @@ struct MaintenanceActivityInlineView: View {
     case .cancelled:
       return false
     }
+  }
+
+  private func localized(_ key: String, _ arguments: CVarArg...) -> String {
+    AppLocalization.string(key, language: settings.language, arguments: arguments)
+  }
+}
+
+struct MaintenanceActivityProminentView: View {
+  @EnvironmentObject private var store: MaintenanceStore
+  @EnvironmentObject private var settings: AppSettings
+
+  let tool: MaintenanceTool
+
+  @State private var showsResults = false
+
+  private var activity: MaintenanceActivity? {
+    guard store.activity?.tool == tool else { return nil }
+    return store.activity
+  }
+
+  private var issueCount: Int {
+    guard let activity else { return 0 }
+    return [
+      activity.failures.count,
+      activity.scanIssues.count,
+      activity.entries.filter { $0.state == .failed }.count,
+    ].max() ?? 0
+  }
+
+  private var canShowResults: Bool {
+    guard let activity, !activity.entries.isEmpty else { return false }
+    return switch activity.phase {
+    case .completed, .cancelled: true
+    case .scanning, .working: false
+    }
+  }
+
+  var body: some View {
+    if let activity {
+      VStack(spacing: 0) {
+        Spacer(minLength: 18)
+
+        VStack(spacing: 16) {
+          activityIcon(activity)
+            .frame(width: 44, height: 44)
+
+          VStack(spacing: 5) {
+            Text(prominentTitle(activity))
+              .font(.title3.weight(.semibold))
+
+            if !isActive(activity) {
+              Text(completionDetail(activity))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            }
+          }
+
+          if isActive(activity) {
+            activityProgress(activity)
+            currentContext(activity)
+              .frame(maxWidth: 430, minHeight: 42)
+          } else if isCompleted(activity) {
+            summary(activity)
+          }
+
+          actions(activity)
+        }
+        .frame(maxWidth: 500)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 24)
+
+        Spacer(minLength: 18)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .accessibilityElement(children: .contain)
+      .transition(.opacity)
+      .sheet(isPresented: $showsResults) {
+        MaintenanceActivityResultsView(
+          activity: activity,
+          tool: tool,
+          statusText: statusText(activity),
+          issueCount: issueCount
+        )
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func activityIcon(_ activity: MaintenanceActivity) -> some View {
+    switch activity.phase {
+    case .scanning, .working:
+      Image(systemName: operationSymbol(activity.operation))
+        .font(.system(size: 30, weight: .medium))
+        .foregroundStyle(.secondary)
+    case .completed:
+      Image(systemName: issueCount > 0 ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+        .font(.system(size: 30, weight: .medium))
+        .foregroundStyle(issueCount > 0 ? Color.orange : Color.green)
+    case .cancelled:
+      Image(systemName: "xmark.circle")
+        .font(.system(size: 30, weight: .medium))
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private func activityProgress(_ activity: MaintenanceActivity) -> some View {
+    VStack(spacing: 7) {
+      HStack(spacing: 12) {
+        Text(statusText(activity))
+        Spacer(minLength: 12)
+        if let progress = activity.progress {
+          Text(DisplayFormat.percent(min(1, max(0, progress)) * 100))
+            .monospacedDigit()
+        }
+      }
+      .font(.caption)
+      .foregroundStyle(.secondary)
+
+      Group {
+        if let progress = activity.progress {
+          ProgressView(value: min(1, max(0, progress)))
+        } else {
+          ProgressView()
+        }
+      }
+      .progressViewStyle(.linear)
+      .tint(.accentColor)
+    }
+    .frame(maxWidth: 430)
+    .accessibilityLabel(Text(activity.title))
+    .accessibilityValue(Text(statusText(activity)))
+  }
+
+  @ViewBuilder
+  private func currentContext(_ activity: MaintenanceActivity) -> some View {
+    if !activity.currentPath.isEmpty {
+      if let location = pathContext(activity.currentPath) {
+        VStack(spacing: 3) {
+          Label(location.name, systemImage: "folder")
+            .font(.subheadline.weight(.medium))
+            .lineLimit(1)
+          Text(location.parent)
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .help(activity.currentPath)
+        }
+      } else {
+        Text(activity.currentPath)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+          .lineLimit(2)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func summary(_ activity: MaintenanceActivity) -> some View {
+    if activity.operation != .memory {
+      HStack(spacing: 30) {
+        summaryItem(
+          value: String(activity.completed),
+          title: activity.operation == .scan ? "Files Scanned" : "Items Processed"
+        )
+
+        if activity.reclaimedBytes > 0 {
+          summaryItem(
+            value: DisplayFormat.bytes(activity.reclaimedBytes),
+            title: "Data Handled"
+          )
+        }
+
+        if issueCount > 0 {
+          summaryItem(
+            value: String(issueCount),
+            title: "Needs Attention",
+            color: .orange
+          )
+        }
+      }
+    }
+  }
+
+  private func summaryItem(
+    value: String,
+    title: LocalizedStringKey,
+    color: Color = .primary
+  ) -> some View {
+    VStack(spacing: 3) {
+      Text(value)
+        .font(.headline)
+        .foregroundStyle(color)
+        .monospacedDigit()
+      Text(title)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
+  private func actions(_ activity: MaintenanceActivity) -> some View {
+    HStack(spacing: 8) {
+      if isActive(activity) {
+        Button("Cancel") {
+          store.cancelCurrentOperation()
+        }
+      } else {
+        if canShowResults {
+          Button {
+            showsResults = true
+          } label: {
+            Label("View Results", systemImage: "list.bullet.rectangle")
+          }
+        }
+
+        Button("Done") {
+          store.dismissActivity()
+        }
+        .keyboardShortcut(.defaultAction)
+      }
+    }
+  }
+
+  private func prominentTitle(_ activity: MaintenanceActivity) -> String {
+    switch activity.phase {
+    case .scanning, .working: activity.title
+    case .completed: localized(issueCount > 0 ? "Completed with Issues" : "Task Complete")
+    case .cancelled: localized("Operation Cancelled")
+    }
+  }
+
+  private func completionDetail(_ activity: MaintenanceActivity) -> String {
+    switch activity.phase {
+    case .cancelled:
+      localized("The operation was cancelled.")
+    case .completed:
+      issueCount > 0
+        ? statusText(activity)
+        : (activity.currentPath.isEmpty ? statusText(activity) : activity.currentPath)
+    case .scanning, .working:
+      statusText(activity)
+    }
+  }
+
+  private func statusText(_ activity: MaintenanceActivity) -> String {
+    switch activity.phase {
+    case .scanning:
+      activity.completed > 0
+        ? localized("%lld files scanned", Int64(activity.completed))
+        : localized("Scanning")
+    case .working:
+      localized(
+        "%lld of %lld completed",
+        Int64(activity.completed),
+        Int64(activity.total)
+      )
+    case .completed:
+      issueCount == 0
+        ? localized("Completed")
+        : localized("%lld items need attention", Int64(issueCount))
+    case .cancelled:
+      localized("Cancelled")
+    }
+  }
+
+  private func isActive(_ activity: MaintenanceActivity) -> Bool {
+    switch activity.phase {
+    case .scanning, .working: true
+    case .completed, .cancelled: false
+    }
+  }
+
+  private func isCompleted(_ activity: MaintenanceActivity) -> Bool {
+    switch activity.phase {
+    case .completed: true
+    case .scanning, .working, .cancelled: false
+    }
+  }
+
+  private func operationSymbol(_ operation: MaintenanceOperationKind) -> String {
+    switch operation {
+    case .scan: "magnifyingglass"
+    case .cleanup: "trash"
+    case .memory: "memorychip"
+    }
+  }
+
+  private func pathContext(_ path: String) -> (name: String, parent: String)? {
+    guard path.hasPrefix("/") else { return nil }
+    let url = URL(fileURLWithPath: path)
+    let name = url.lastPathComponent
+    guard !name.isEmpty else { return nil }
+    return (name, url.deletingLastPathComponent().path)
   }
 
   private func localized(_ key: String, _ arguments: CVarArg...) -> String {

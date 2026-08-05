@@ -12,6 +12,7 @@ struct MacScopeNativeApp: App {
         .environmentObject(runtime.monitor.metrics)
         .environmentObject(runtime.settings)
         .environmentObject(runtime.maintenance)
+        .environmentObject(runtime.startupItems)
         .environmentObject(runtime.navigation)
         .environment(\.locale, runtime.settings.language.locale)
         .preferredColorScheme(runtime.settings.appearance.colorScheme)

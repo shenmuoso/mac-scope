@@ -131,12 +131,12 @@ struct HelpView: View {
         HelpItem(
           systemImage: "cpu",
           title: "System Metrics",
-          detail: "CPU, temperature, memory, disk, and network values update automatically."
+          detail: "CPU, memory, disk, and network values update automatically."
         ),
         HelpItem(
-          systemImage: "arrow.up.arrow.down",
-          title: "Process Ranking",
-          detail: "Click a table heading to rank processes by the resource that matters now."
+          systemImage: "chart.xyaxis.line",
+          title: "Activity History",
+          detail: "Recent system charts make short spikes and sustained activity easier to compare."
         ),
         HelpItem(
           systemImage: "pause.fill",

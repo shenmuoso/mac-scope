@@ -23,7 +23,10 @@ final class SystemMetricsStore: ObservableObject {
         networkUploadRate: metrics.network.uploadRate,
         temperatureCelsius: metrics.cpu.temperature.socCelsius,
         systemPowerWatts: metrics.power.systemWatts,
-        chargingPowerWatts: metrics.power.chargingWatts
+        chargingPowerWatts: metrics.power.chargingWatts,
+        fanReadings: metrics.cooling.fans.map {
+          FanHistoryReading(id: $0.id, rpm: $0.currentRPM)
+        }
       )
     )
     snapshot = metrics
@@ -31,7 +34,12 @@ final class SystemMetricsStore: ObservableObject {
 }
 
 enum ProcessSamplingClient: Hashable, Sendable {
-  case overview
+  case processManagement
+  case menuBar
+}
+
+enum MetricsSamplingClient: Hashable, Sendable {
+  case mainWindow
   case menuBar
 }
 
@@ -50,8 +58,10 @@ final class SystemMonitor: ObservableObject {
   private var metricsMonitoringTask: Task<Void, Never>?
   private var processMonitoringTask: Task<Void, Never>?
   private var trackedPID: Int32?
+  private var metricsSamplingClients: Set<MetricsSamplingClient> = []
   private var processSamplingClients: Set<ProcessSamplingClient> = []
   private var processResumeTask: Task<Void, Never>?
+  private var manualRefreshTask: Task<Void, Never>?
   private var processSamplingGeneration = 0
   private var metricsRefreshing = false
   private var processesRefreshing = false
@@ -91,7 +101,10 @@ final class SystemMonitor: ObservableObject {
           await refreshMetrics()
         }
         let elapsed = ProcessInfo.processInfo.systemUptime - refreshStartedAt
-        let delaySeconds = max(0.05, max(0.2, refreshInterval) - elapsed)
+        let activeInterval = self.metricsSamplingClients.isEmpty
+          ? max(2, self.refreshInterval)
+          : self.refreshInterval
+        let delaySeconds = max(0.05, max(0.2, activeInterval) - elapsed)
         let delay = UInt64(delaySeconds * 1_000_000_000)
         try? await Task.sleep(nanoseconds: delay)
       }
@@ -105,22 +118,22 @@ final class SystemMonitor: ObservableObject {
     processMonitoringTask = nil
     processResumeTask?.cancel()
     processResumeTask = nil
+    manualRefreshTask?.cancel()
+    manualRefreshTask = nil
+    isRefreshing = false
   }
 
   func refreshMetrics() async {
     guard !metricsRefreshing else { return }
     metricsRefreshing = true
-    isRefreshing = true
     let nextSnapshot = await metricsSampler.sampleMetrics()
     metrics.update(from: nextSnapshot)
     metricsRefreshing = false
-    isRefreshing = metricsRefreshing || processesRefreshing
   }
 
   func refreshProcesses(generation: Int? = nil) async {
     guard isProcessSamplingRequested, !processesRefreshing else { return }
     processesRefreshing = true
-    isRefreshing = true
     let samplingGeneration = generation ?? processSamplingGeneration
     let nextProcesses = await processSampler.sampleProcesses()
     if isProcessSamplingRequested, samplingGeneration == processSamplingGeneration {
@@ -130,14 +143,23 @@ final class SystemMonitor: ObservableObject {
       processes = nextProcesses
     }
     processesRefreshing = false
-    isRefreshing = metricsRefreshing || processesRefreshing
   }
 
   func refreshNow(forceProcessSample: Bool = true) {
-    Task { await refreshMetrics() }
-    if forceProcessSample, isProcessSamplingRequested {
-      let generation = processSamplingGeneration
-      Task { await refreshProcesses(generation: generation) }
+    guard manualRefreshTask == nil else { return }
+    let shouldRefreshProcesses = forceProcessSample && isProcessSamplingRequested
+    let generation = processSamplingGeneration
+    isRefreshing = true
+    manualRefreshTask = Task { [weak self] in
+      guard let self else { return }
+      defer {
+        self.isRefreshing = false
+        self.manualRefreshTask = nil
+      }
+      await self.refreshMetrics()
+      if shouldRefreshProcesses {
+        await self.refreshProcesses(generation: generation)
+      }
     }
   }
 
@@ -172,6 +194,23 @@ final class SystemMonitor: ObservableObject {
     }
   }
 
+  func setMetricsSampling(_ isActive: Bool, for client: MetricsSamplingClient) {
+    let wasActive = !metricsSamplingClients.isEmpty
+    if isActive {
+      metricsSamplingClients.insert(client)
+    } else {
+      metricsSamplingClients.remove(client)
+    }
+    let isPresentationActive = !metricsSamplingClients.isEmpty
+    guard wasActive != isPresentationActive, metricsMonitoringTask != nil else {
+      return
+    }
+
+    metricsMonitoringTask?.cancel()
+    metricsMonitoringTask = nil
+    startMetricsMonitoring()
+  }
+
   private func startProcessMonitoring(generation: Int) {
     processMonitoringTask?.cancel()
     processMonitoringTask = Task { [weak self] in
@@ -185,7 +224,9 @@ final class SystemMonitor: ObservableObject {
           await self.refreshProcesses(generation: generation)
         }
         let elapsed = ProcessInfo.processInfo.systemUptime - refreshStartedAt
-        let delaySeconds = max(0.05, max(0.5, self.refreshInterval) - elapsed)
+        // Enumerating every process includes ps, nettop, and per-PID kernel queries.
+        // Keep that heavier path independent from the lightweight metric cadence.
+        let delaySeconds = max(0.05, max(2, self.refreshInterval) - elapsed)
         let delay = UInt64(delaySeconds * 1_000_000_000)
         try? await Task.sleep(nanoseconds: delay)
       }

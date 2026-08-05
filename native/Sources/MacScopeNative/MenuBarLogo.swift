@@ -3,11 +3,18 @@ import SwiftUI
 
 @MainActor
 enum MenuBarLogoAsset {
-  static let image: NSImage = {
-    let image = NSImage(size: NSSize(width: 16, height: 16), flipped: true) { bounds in
+  static let image = makeImage(trailingSpacing: 0)
+  static let compactStatusImage = makeImage(trailingSpacing: 6)
+
+  private static func makeImage(trailingSpacing: CGFloat) -> NSImage {
+    let image = NSImage(
+      size: NSSize(width: 16 + trailingSpacing, height: 16),
+      flipped: true
+    ) { bounds in
       let outlineWidth: CGFloat = 1.25
       let waveformWidth: CGFloat = 1.15
-      let symbolBounds = bounds.insetBy(dx: 1, dy: 1)
+      let drawingBounds = NSRect(x: bounds.minX, y: bounds.minY, width: 16, height: 16)
+      let symbolBounds = drawingBounds.insetBy(dx: 1, dy: 1)
 
       NSColor.black.setStroke()
 
@@ -28,8 +35,8 @@ enum MenuBarLogoAsset {
       let waveform = NSBezierPath()
       for (index, point) in points.enumerated() {
         let scaled = CGPoint(
-          x: bounds.minX + point.x * bounds.width,
-          y: bounds.minY + point.y * bounds.height
+          x: drawingBounds.minX + point.x * drawingBounds.width,
+          y: drawingBounds.minY + point.y * drawingBounds.height
         )
         if index == 0 {
           waveform.move(to: scaled)
@@ -46,7 +53,7 @@ enum MenuBarLogoAsset {
     image.isTemplate = true
     image.accessibilityDescription = "MacScope"
     return image
-  }()
+  }
 }
 
 struct MenuBarLogo: View {
@@ -133,6 +140,8 @@ struct MenuBarStatusPresentation {
       return "PWR \(DisplayFormat.compactPower(snapshot.power.systemWatts))"
     case .chargingPower:
       return "CHG \(DisplayFormat.compactPower(snapshot.power.chargingWatts))"
+    case .fan:
+      return "FAN \(DisplayFormat.compactFanSpeed(snapshot.cooling.fans.map(\.currentRPM).max()))"
     }
   }
 }

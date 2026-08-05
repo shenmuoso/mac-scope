@@ -35,5 +35,7 @@
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MacScope uses System Events to show and manage the applications configured to open when you log in.</string>
 </dict>
 </plist>
