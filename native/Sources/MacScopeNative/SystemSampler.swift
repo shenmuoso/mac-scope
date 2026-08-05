@@ -45,6 +45,9 @@ actor SystemSampler {
   private var temperatureUpdatedAt = -TimeInterval.infinity
   private var power = PowerUsage.unavailable
   private var powerUpdatedAt = -TimeInterval.infinity
+  private let smcReader = SMCReader()
+  private var cooling = CoolingUsage.unavailable
+  private var coolingUpdatedAt = -TimeInterval.infinity
 
   func sampleMetrics() -> SystemSnapshot {
     let now = ProcessInfo.processInfo.systemUptime
@@ -56,6 +59,11 @@ actor SystemSampler {
     if now - powerUpdatedAt >= 1 {
       power = PowerMetricsReader.read()
       powerUpdatedAt = now
+    }
+    let coolingInterval: TimeInterval = cooling.state == .available ? 2 : 30
+    if now - coolingUpdatedAt >= coolingInterval {
+      cooling = smcReader.readCoolingUsage()
+      coolingUpdatedAt = now
     }
     let cpuTicks = readCPUTicks()
     let diskCounters = readDiskCounters()
@@ -105,6 +113,7 @@ actor SystemSampler {
       disk: disk,
       network: network,
       power: power,
+      cooling: cooling,
       processes: []
     )
   }

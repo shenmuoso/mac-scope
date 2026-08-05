@@ -15,6 +15,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
   case temperature
   case systemPower
   case chargingPower
+  case fan
 
   var id: String { rawValue }
 
@@ -27,6 +28,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
     case .temperature: "CPU Temperature"
     case .systemPower: "System Power"
     case .chargingPower: "Charging Power"
+    case .fan: "Fan Speed"
     }
   }
 
@@ -39,6 +41,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
     case .temperature: "thermometer.medium"
     case .systemPower: "bolt.fill"
     case .chargingPower: "battery.100percent.bolt"
+    case .fan: "fan"
     }
   }
 }
@@ -51,6 +54,7 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
   case temperature
   case systemPower
   case chargingPower
+  case fan
   case processes
 
   var id: String { rawValue }
@@ -64,6 +68,7 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
     case .temperature: "Temperature"
     case .systemPower: "System Power"
     case .chargingPower: "Charging Power"
+    case .fan: "Fan Speed"
     case .processes: "Top Processes"
     }
   }
@@ -77,6 +82,7 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
     case .temperature: "thermometer.medium"
     case .systemPower: "bolt.fill"
     case .chargingPower: "battery.100percent.bolt"
+    case .fan: "fan"
     case .processes: "list.number"
     }
   }

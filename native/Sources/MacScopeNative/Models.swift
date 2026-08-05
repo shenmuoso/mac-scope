@@ -46,6 +46,28 @@ struct PowerUsage: Sendable, Equatable {
   )
 }
 
+enum FanSupportState: String, Sendable {
+  case available
+  case fanless
+  case unavailable
+}
+
+struct FanReading: Identifiable, Sendable {
+  let id: Int
+  let name: String
+  let currentRPM: Double
+  let minimumRPM: Double?
+  let maximumRPM: Double?
+  let targetRPM: Double?
+}
+
+struct CoolingUsage: Sendable {
+  let state: FanSupportState
+  let fans: [FanReading]
+
+  static let unavailable = CoolingUsage(state: .unavailable, fans: [])
+}
+
 struct MemoryUsage: Sendable {
   var used: UInt64
   var available: UInt64
@@ -317,8 +339,14 @@ struct SystemHistoryPoint: Identifiable, Sendable {
   let temperatureCelsius: Double?
   let systemPowerWatts: Double?
   let chargingPowerWatts: Double?
+  let fanReadings: [FanHistoryReading]
 
   var id: Date { timestamp }
+}
+
+struct FanHistoryReading: Sendable {
+  let id: Int
+  let rpm: Double
 }
 
 struct SystemSnapshot: Sendable {
@@ -328,6 +356,7 @@ struct SystemSnapshot: Sendable {
   var disk: DiskUsage
   var network: NetworkUsage
   var power: PowerUsage
+  var cooling: CoolingUsage
   var processes: [ProcessRow]
 
   static let empty = SystemSnapshot(
@@ -337,6 +366,7 @@ struct SystemSnapshot: Sendable {
     disk: DiskUsage(used: 0, available: 0, total: 0, readRate: 0, writeRate: 0),
     network: NetworkUsage(downloadRate: 0, uploadRate: 0, downloadTotal: 0, uploadTotal: 0),
     power: .unavailable,
+    cooling: .unavailable,
     processes: []
   )
 }

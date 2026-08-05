@@ -5,6 +5,7 @@ import SwiftUI
 
 enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   case overview
+  case performancePower
   case systemInfo
   case battery
   case ports
@@ -20,6 +21,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   var title: LocalizedStringKey {
     switch self {
     case .overview: "Overview"
+    case .performancePower: "Performance & Power"
     case .systemInfo: "System Information"
     case .battery: "Battery Health"
     case .ports: "Ports"
@@ -36,10 +38,12 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .overview:
       "Live CPU, memory, disk, network, and process activity."
+    case .performancePower:
+      "Real-time CPU, power, temperature, and cooling activity."
     case .systemInfo:
       "Hardware, storage, displays, and connected devices on this Mac."
     case .battery:
-      "Charge, capacity, cycle count, temperature, and power activity."
+      "Charge, capacity, cycle count, temperature, and electrical condition."
     case .ports:
       "Listening ports and the processes and software using them."
     case .downloads:
@@ -60,6 +64,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   var systemImage: String {
     switch self {
     case .overview: "gauge.with.dots.needle.50percent"
+    case .performancePower: "bolt.circle"
     case .systemInfo: "desktopcomputer"
     case .battery: "battery.100percent"
     case .ports: "network"
@@ -76,6 +81,8 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .overview:
       Color(nsColor: .black)
+    case .performancePower:
+      Color(nsColor: .systemOrange)
     case .systemInfo:
       Color(nsColor: .systemGray)
     case .battery, .memory:

@@ -106,7 +106,7 @@ struct PowerMetricsReaderTests {
     #expect(usage.adapterInputWatts == nil)
   }
 
-  @Test("Power menu items are disabled by default")
+  @Test("Optional power and fan menu items are disabled by default")
   @MainActor
   func defaultsKeepPowerItemsDisabled() throws {
     let suiteName = "PowerMetricsReaderTests.\(UUID().uuidString)"
@@ -117,7 +117,9 @@ struct PowerMetricsReaderTests {
 
     #expect(!settings.menuBarMetrics.contains(.systemPower))
     #expect(!settings.menuBarMetrics.contains(.chargingPower))
+    #expect(!settings.menuBarMetrics.contains(.fan))
     #expect(!settings.menuBarModules.contains(.systemPower))
     #expect(!settings.menuBarModules.contains(.chargingPower))
+    #expect(!settings.menuBarModules.contains(.fan))
   }
 }

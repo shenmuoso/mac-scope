@@ -140,6 +140,8 @@ struct MenuBarStatusPresentation {
       return "PWR \(DisplayFormat.compactPower(snapshot.power.systemWatts))"
     case .chargingPower:
       return "CHG \(DisplayFormat.compactPower(snapshot.power.chargingWatts))"
+    case .fan:
+      return "FAN \(DisplayFormat.compactFanSpeed(snapshot.cooling.fans.map(\.currentRPM).max()))"
     }
   }
 }

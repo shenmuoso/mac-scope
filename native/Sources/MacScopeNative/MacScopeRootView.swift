@@ -21,6 +21,7 @@ struct MacScopeRootView: View {
         List(selection: destinationSelection) {
           Section("Monitor") {
             sidebarRow(.overview)
+            sidebarRow(.performancePower)
           }
           Section("Hardware") {
             sidebarRow(.systemInfo)
@@ -107,6 +108,8 @@ struct MacScopeRootView: View {
     switch navigation.destination {
     case .overview:
       DashboardView()
+    case .performancePower:
+      PerformancePowerView()
     case .systemInfo:
       HardwareInfoView()
     case .battery:

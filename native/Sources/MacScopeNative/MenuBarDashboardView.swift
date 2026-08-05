@@ -295,6 +295,15 @@ private struct MenuBarMetricRow: View {
         progress: nil,
         progressColor: .clear
       )
+    case .fan:
+      return MetricPresentation(
+        value: DisplayFormat.fanSpeed(snapshot.cooling.fans.map(\.currentRPM).max()) ?? "--",
+        detail: fanDetail(snapshot.cooling),
+        accentColor: accent(.blue),
+        valueColor: .primary,
+        progress: nil,
+        progressColor: .clear
+      )
     case .processes:
       preconditionFailure("Processes use a dedicated module view")
     }
@@ -322,6 +331,18 @@ private struct MenuBarMetricRow: View {
     case .normal: localized("Normal")
     case .warm: localized("Warm")
     case .hot: localized("Hot")
+    }
+  }
+
+  private func fanDetail(_ cooling: CoolingUsage) -> String {
+    switch cooling.state {
+    case .available:
+      if cooling.fans.count == 1 { return localized("1 Fan") }
+      return localized("%lld Fans", cooling.fans.count)
+    case .fanless:
+      return localized("Fanless Mac")
+    case .unavailable:
+      return localized("Fan Telemetry Unavailable")
     }
   }
 
@@ -395,6 +416,8 @@ private struct MetricSparkline: View {
         value = point.systemPowerWatts
       case .chargingPower:
         value = point.chargingPowerWatts
+      case .fan:
+        value = point.fanReadings.map(\.rpm).max()
       case .processes:
         value = nil
       }
@@ -410,6 +433,8 @@ private struct MetricSparkline: View {
       return 0...max(1, (points.map(\.value).max() ?? 0) * 1.12)
     case .systemPower, .chargingPower:
       return 0...max(1, (points.map(\.value).max() ?? 0) * 1.12)
+    case .fan:
+      return 0...max(1_000, (points.map(\.value).max() ?? 0) * 1.12)
     case .temperature:
       let values = points.map(\.value)
       let minimum = values.min() ?? 0

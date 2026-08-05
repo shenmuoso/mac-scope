@@ -449,8 +449,6 @@ struct BatteryHealthView: View {
           )
         }
 
-        powerPanel(battery)
-
         if !capacityItems(battery).isEmpty {
           capacityPanel(battery)
         }
@@ -466,70 +464,6 @@ struct BatteryHealthView: View {
       .padding(.bottom, 28)
     }
     .compactNativeScrollers()
-  }
-
-  private func powerPanel(_ battery: BatterySnapshot) -> some View {
-    BatteryPanel(title: "Recent Power Activity") {
-      HStack(spacing: 28) {
-        BatteryPowerReading(
-          title: "System Power",
-          value: DisplayFormat.power(currentSystemPower(battery)) ?? "--",
-          color: .blue
-        )
-        BatteryPowerReading(
-          title: "Charging Power",
-          value: DisplayFormat.power(currentChargingPower(battery)) ?? "--",
-          color: .green
-        )
-        Spacer(minLength: 0)
-        Text("Last 60 Seconds")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-
-      if powerPoints.count > 2 {
-        Chart(powerPoints) { point in
-          LineMark(
-            x: .value("Time", point.timestamp),
-            y: .value("Power", point.watts),
-            series: .value("Series", point.series.rawValue)
-          )
-          .foregroundStyle(point.series.color)
-          .interpolationMethod(.catmullRom)
-          .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-        }
-        .chartXAxis(.hidden)
-        .chartYAxis {
-          AxisMarks(position: .leading) {
-            AxisGridLine()
-              .foregroundStyle(Color.secondary.opacity(0.18))
-            AxisValueLabel()
-          }
-        }
-        .chartYScale(domain: powerDomain)
-        .frame(height: 180)
-        .transaction { transaction in
-          transaction.animation = nil
-        }
-
-        HStack {
-          Text("60 Seconds Ago")
-          Spacer()
-          Text("Now")
-        }
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
-      } else {
-        VStack(spacing: 8) {
-          ProgressView()
-            .controlSize(.small)
-          Text("Collecting Power Activity")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, minHeight: 180)
-      }
-    }
   }
 
   private func capacityPanel(_ battery: BatterySnapshot) -> some View {
@@ -551,6 +485,11 @@ struct BatteryHealthView: View {
         }
       }
       .chartXAxis(.hidden)
+      .chartYAxis {
+        AxisMarks(position: .leading) {
+          AxisValueLabel()
+        }
+      }
       .chartXScale(domain: 0...maximum)
       .frame(height: CGFloat(items.count * 44 + 12))
     }
@@ -604,41 +543,8 @@ struct BatteryHealthView: View {
           systemImage: "waveform.path",
           value: battery.amperageMilliamps.map { "\($0) mA" } ?? "--"
         )
-        Divider()
-        BatteryDetailRow(
-          title: "System Power",
-          systemImage: "gauge.with.dots.needle.50percent",
-          value: DisplayFormat.power(currentSystemPower(battery)) ?? "--"
-        )
-        Divider()
-        BatteryDetailRow(
-          title: "Charging Power",
-          systemImage: "battery.100percent.bolt",
-          value: DisplayFormat.power(currentChargingPower(battery)) ?? "--"
-        )
       }
     }
-  }
-
-  private var powerPoints: [BatteryPowerPoint] {
-    metrics.history.flatMap { point in
-      var values: [BatteryPowerPoint] = []
-      if let watts = point.systemPowerWatts {
-        values.append(
-          BatteryPowerPoint(timestamp: point.timestamp, watts: watts, series: .system)
-        )
-      }
-      if let watts = point.chargingPowerWatts {
-        values.append(
-          BatteryPowerPoint(timestamp: point.timestamp, watts: watts, series: .charging)
-        )
-      }
-      return values
-    }
-  }
-
-  private var powerDomain: ClosedRange<Double> {
-    0...max(1, (powerPoints.map(\.watts).max() ?? 0) * 1.15)
   }
 
   private func capacityItems(_ battery: BatterySnapshot) -> [BatteryCapacityItem] {
@@ -661,14 +567,6 @@ struct BatteryHealthView: View {
         BatteryCapacityItem(titleKey: "Remaining Capacity", value: $0, color: .green)
       },
     ].compactMap { $0 }
-  }
-
-  private func currentSystemPower(_ battery: BatterySnapshot) -> Double? {
-    metrics.snapshot.power.systemWatts ?? battery.systemPowerWatts
-  }
-
-  private func currentChargingPower(_ battery: BatterySnapshot) -> Double? {
-    metrics.snapshot.power.chargingWatts ?? battery.chargingPowerWatts
   }
 
   private func batteryTemperature(_ battery: BatterySnapshot) -> String {
@@ -791,28 +689,6 @@ private struct BatteryPanel<Content: View>: View {
   }
 }
 
-private struct BatteryPowerReading: View {
-  let title: LocalizedStringKey
-  let value: String
-  let color: Color
-
-  var body: some View {
-    HStack(spacing: 8) {
-      Circle()
-        .fill(color)
-        .frame(width: 7, height: 7)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(title)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        Text(value)
-          .font(.title3.weight(.semibold))
-          .monospacedDigit()
-      }
-    }
-  }
-}
-
 private struct BatteryDetailRow: View {
   let title: LocalizedStringKey
   let systemImage: String
@@ -838,26 +714,4 @@ private struct BatteryCapacityItem: Identifiable {
   let color: Color
 
   var id: String { titleKey }
-}
-
-private struct BatteryPowerPoint: Identifiable {
-  enum Series: String {
-    case system
-    case charging
-
-    var color: Color {
-      switch self {
-      case .system: .blue
-      case .charging: .green
-      }
-    }
-  }
-
-  let timestamp: Date
-  let watts: Double
-  let series: Series
-
-  var id: String {
-    "\(timestamp.timeIntervalSinceReferenceDate):\(series.rawValue)"
-  }
 }

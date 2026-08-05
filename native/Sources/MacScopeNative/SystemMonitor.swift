@@ -23,7 +23,10 @@ final class SystemMetricsStore: ObservableObject {
         networkUploadRate: metrics.network.uploadRate,
         temperatureCelsius: metrics.cpu.temperature.socCelsius,
         systemPowerWatts: metrics.power.systemWatts,
-        chargingPowerWatts: metrics.power.chargingWatts
+        chargingPowerWatts: metrics.power.chargingWatts,
+        fanReadings: metrics.cooling.fans.map {
+          FanHistoryReading(id: $0.id, rpm: $0.currentRPM)
+        }
       )
     )
     snapshot = metrics
