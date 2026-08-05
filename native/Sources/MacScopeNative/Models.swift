@@ -168,6 +168,116 @@ struct ProcessRow: Identifiable, Hashable, Sendable {
   }
 }
 
+enum ProcessSortField: String, CaseIterable, Hashable, Sendable {
+  case name
+  case pid
+  case cpu
+  case memory
+  case diskRead
+  case diskWrite
+  case download
+  case upload
+  case threads
+  case runtime
+
+  var defaultDirection: ProcessSortDirection {
+    switch self {
+    case .name, .pid: .ascending
+    case .cpu, .memory, .diskRead, .diskWrite, .download, .upload, .threads, .runtime:
+      .descending
+    }
+  }
+}
+
+enum ProcessSortDirection: Hashable, Sendable {
+  case ascending
+  case descending
+
+  mutating func toggle() {
+    self = self == .ascending ? .descending : .ascending
+  }
+}
+
+struct ProcessSortDescriptor: Hashable, Sendable {
+  var field: ProcessSortField
+  var direction: ProcessSortDirection
+
+  static let initial = ProcessSortDescriptor(field: .cpu, direction: .descending)
+
+  mutating func select(_ selectedField: ProcessSortField) {
+    if field == selectedField {
+      direction.toggle()
+    } else {
+      field = selectedField
+      direction = selectedField.defaultDirection
+    }
+  }
+
+  func sorted(processes: [ProcessRow]) -> [ProcessRow] {
+    processes.sorted(by: comesFirst)
+  }
+
+  private func comesFirst(_ lhs: ProcessRow, _ rhs: ProcessRow) -> Bool {
+    let primaryOrder: Bool?
+    switch field {
+    case .name:
+      primaryOrder = compare(lhs.name, rhs.name)
+    case .pid:
+      primaryOrder = compare(lhs.pid, rhs.pid)
+    case .cpu:
+      primaryOrder = compare(lhs.cpuPercent, rhs.cpuPercent)
+    case .memory:
+      primaryOrder = compare(lhs.memoryBytes, rhs.memoryBytes)
+    case .diskRead:
+      primaryOrder = compare(lhs.diskReadRate, rhs.diskReadRate)
+    case .diskWrite:
+      primaryOrder = compare(lhs.diskWriteRate, rhs.diskWriteRate)
+    case .download:
+      primaryOrder = compare(lhs.networkDownloadRate, rhs.networkDownloadRate)
+    case .upload:
+      primaryOrder = compare(lhs.networkUploadRate, rhs.networkUploadRate)
+    case .threads:
+      primaryOrder = compare(lhs.threadCount, rhs.threadCount)
+    case .runtime:
+      primaryOrder = compare(lhs.runtime, rhs.runtime)
+    }
+    if let primaryOrder { return primaryOrder }
+
+    let nameOrder = ascendingStringOrder(lhs.name, rhs.name)
+    if let nameOrder { return nameOrder }
+    return lhs.pid < rhs.pid
+  }
+
+  private func compare<T: Comparable>(_ lhs: T, _ rhs: T) -> Bool? {
+    if lhs < rhs { return direction == .ascending }
+    if lhs > rhs { return direction == .descending }
+    return nil
+  }
+
+  private func compare(_ lhs: Double, _ rhs: Double) -> Bool? {
+    if lhs.isFinite != rhs.isFinite { return lhs.isFinite }
+    guard lhs.isFinite else { return nil }
+    if lhs < rhs { return direction == .ascending }
+    if lhs > rhs { return direction == .descending }
+    return nil
+  }
+
+  private func compare(_ lhs: String, _ rhs: String) -> Bool? {
+    let result = lhs.localizedStandardCompare(rhs)
+    guard result != .orderedSame else { return nil }
+    switch direction {
+    case .ascending: return result == .orderedAscending
+    case .descending: return result == .orderedDescending
+    }
+  }
+
+  private func ascendingStringOrder(_ lhs: String, _ rhs: String) -> Bool? {
+    let result = lhs.localizedStandardCompare(rhs)
+    guard result != .orderedSame else { return nil }
+    return result == .orderedAscending
+  }
+}
+
 struct SoftwareProcessGroup: Identifiable, Hashable, Sendable {
   let software: SoftwareIdentity
   let processes: [ProcessRow]

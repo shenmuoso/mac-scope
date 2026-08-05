@@ -79,9 +79,7 @@ struct ProcessManagementView: View {
 
   @State private var searchText = ""
   @State private var selection: ProcessRow.ID?
-  @State private var sortOrder = [
-    KeyPathComparator(\ProcessRow.cpuPercent, order: .reverse)
-  ]
+  @State private var processSort = ProcessSortDescriptor.initial
   @State private var pendingCommand: ProcessCommand?
   @State private var operationError: String?
   @State private var showsInspector = false
@@ -89,30 +87,13 @@ struct ProcessManagementView: View {
   @State private var originFilter = ProcessOriginFilter.all
   @State private var softwareSort = SoftwareSortDescriptor.initial
   @State private var expandedSoftwareIDs = Set<SoftwareIdentity.ID>()
+  @State private var filteredProcesses: [ProcessRow] = []
+  @State private var visibleProcesses: [ProcessRow] = []
+  @State private var visibleSoftwareGroups: [SoftwareProcessGroup] = []
 
   private var selectedProcess: ProcessRow? {
     guard let pid = selection else { return nil }
     return monitor.processes.first { $0.pid == pid }
-  }
-
-  private var filteredProcesses: [ProcessRow] {
-    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    return monitor.processes.filter { process in
-      guard originFilter.includes(process.software.origin) else { return false }
-      return query.isEmpty
-        || process.name.lowercased().contains(query)
-        || String(process.pid).contains(query)
-        || process.software.name.lowercased().contains(query)
-        || process.software.bundleIdentifier?.lowercased().contains(query) == true
-    }
-  }
-
-  private var visibleProcesses: [ProcessRow] {
-    filteredProcesses.sorted(using: sortOrder)
-  }
-
-  private var visibleSoftwareGroups: [SoftwareProcessGroup] {
-    softwareSort.sorted(groups: SoftwareProcessGroup.groups(from: filteredProcesses))
   }
 
   var body: some View {
@@ -192,15 +173,21 @@ struct ProcessManagementView: View {
       monitor.trackProcess(selected)
     }
     .onChange(of: searchText) { _ in
+      rebuildFilteredProcesses()
       clearHiddenSelection()
     }
     .onChange(of: originFilter) { _ in
+      rebuildFilteredProcesses()
       clearHiddenSelection()
+    }
+    .onChange(of: sortsBySoftware) { _ in
+      rebuildVisibleSnapshot()
     }
     .onChange(of: navigation.processInspectionRequest) { request in
       handleProcessInspection(request)
     }
     .onReceive(monitor.$processes) { processes in
+      rebuildFilteredProcesses(from: processes)
       if let selection, !processes.contains(where: { $0.pid == selection }) {
         self.selection = nil
         showsInspector = false
@@ -209,6 +196,7 @@ struct ProcessManagementView: View {
       handleProcessInspection(navigation.processInspectionRequest)
     }
     .onAppear {
+      rebuildFilteredProcesses()
       handleProcessInspection(navigation.processInspectionRequest)
     }
     .onDisappear {
@@ -346,90 +334,25 @@ struct ProcessManagementView: View {
   }
 
   private var processTable: some View {
-    Table(visibleProcesses, selection: $selection, sortOrder: $sortOrder) {
-      TableColumn("Process", value: \.name) { process in
-        ProcessIdentityView(process: process)
+    ProcessTableView(
+      rows: visibleProcesses,
+      selection: $selection,
+      sort: processSortBinding,
+      labels: ProcessTableLabels(language: settings.language),
+      onInspect: { process in
+        selection = process.pid
+        monitor.trackProcess(process.pid)
+        showInspector()
+      },
+      onQuit: { process in
+        selection = process.pid
+        pendingCommand = .quit(process)
+      },
+      onForceQuit: { process in
+        selection = process.pid
+        pendingCommand = .forceQuit(process)
       }
-      .width(min: 220, ideal: 290)
-
-      TableColumn("PID", value: \.pid) { process in
-        Text(process.pid, format: .number.grouping(.never))
-          .monospacedDigit()
-      }
-      .width(70)
-
-      TableColumn("CPU", value: \.cpuPercent) { process in
-        Text(DisplayFormat.percent(process.cpuPercent))
-          .monospacedDigit()
-      }
-      .width(76)
-
-      TableColumn("Memory", value: \.memoryBytes) { process in
-        Text(DisplayFormat.bytes(process.memoryBytes))
-          .monospacedDigit()
-      }
-      .width(100)
-
-      TableColumn("Disk Read", value: \.diskReadRate) { process in
-        Text(DisplayFormat.rate(process.diskReadRate))
-          .monospacedDigit()
-      }
-      .width(92)
-
-      TableColumn("Disk Write", value: \.diskWriteRate) { process in
-        Text(DisplayFormat.rate(process.diskWriteRate))
-          .monospacedDigit()
-      }
-      .width(92)
-
-      TableColumn("Download", value: \.networkDownloadRate) { process in
-        Text(DisplayFormat.rate(process.networkDownloadRate))
-          .monospacedDigit()
-      }
-      .width(96)
-
-      TableColumn("Upload", value: \.networkUploadRate) { process in
-        Text(DisplayFormat.rate(process.networkUploadRate))
-          .monospacedDigit()
-      }
-      .width(92)
-
-      TableColumn("Threads", value: \.threadCount) { process in
-        Text(process.threadCount, format: .number.grouping(.never))
-          .monospacedDigit()
-      }
-      .width(76)
-
-      TableColumn("Runtime", value: \.runtime) { process in
-        Text(DisplayFormat.duration(process.runtime))
-          .monospacedDigit()
-      }
-      .width(90)
-    }
-    .contextMenu(forSelectionType: ProcessRow.ID.self) { selected in
-      if let pid = selected.first,
-        let process = monitor.processes.first(where: { $0.pid == pid })
-      {
-        Button("Show Process Info") {
-          selection = pid
-          monitor.trackProcess(pid)
-          showInspector()
-        }
-        Divider()
-        Button("Quit Process") { pendingCommand = .quit(process) }
-        Button("Force Quit", role: .destructive) {
-          pendingCommand = .forceQuit(process)
-        }
-      }
-    }
-    .simultaneousGesture(
-      TapGesture(count: 2)
-        .onEnded {
-          guard selectedProcess != nil else { return }
-          showInspector()
-        }
     )
-    .compactNativeScrollers()
   }
 
   private var softwareGroups: some View {
@@ -437,7 +360,7 @@ struct ProcessManagementView: View {
       groups: visibleSoftwareGroups,
       selection: $selection,
       expandedIDs: $expandedSoftwareIDs,
-      sort: $softwareSort,
+      sort: softwareSortBinding,
       onInspect: { process in
         selection = process.pid
         monitor.trackProcess(process.pid)
@@ -471,6 +394,30 @@ struct ProcessManagementView: View {
 
   private var dashboardTitle: LocalizedStringKey {
     sortsBySoftware ? "Software" : "Processes"
+  }
+
+  private var processSortBinding: Binding<ProcessSortDescriptor> {
+    Binding(
+      get: { processSort },
+      set: { nextSort in
+        guard processSort != nextSort else { return }
+        processSort = nextSort
+        visibleProcesses = nextSort.sorted(processes: filteredProcesses)
+      }
+    )
+  }
+
+  private var softwareSortBinding: Binding<SoftwareSortDescriptor> {
+    Binding(
+      get: { softwareSort },
+      set: { nextSort in
+        guard softwareSort != nextSort else { return }
+        softwareSort = nextSort
+        visibleSoftwareGroups = nextSort.sorted(
+          groups: SoftwareProcessGroup.groups(from: filteredProcesses)
+        )
+      }
+    )
   }
 
   private func toggleInspector() {
@@ -514,6 +461,29 @@ struct ProcessManagementView: View {
     navigation.completeProcessInspection(request)
   }
 
+  private func rebuildFilteredProcesses(from source: [ProcessRow]? = nil) {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    filteredProcesses = (source ?? monitor.processes).filter { process in
+      guard originFilter.includes(process.software.origin) else { return false }
+      return query.isEmpty
+        || process.name.lowercased().contains(query)
+        || String(process.pid).contains(query)
+        || process.software.name.lowercased().contains(query)
+        || process.software.bundleIdentifier?.lowercased().contains(query) == true
+    }
+    rebuildVisibleSnapshot()
+  }
+
+  private func rebuildVisibleSnapshot() {
+    if sortsBySoftware {
+      visibleSoftwareGroups = softwareSort.sorted(
+        groups: SoftwareProcessGroup.groups(from: filteredProcesses)
+      )
+    } else {
+      visibleProcesses = processSort.sorted(processes: filteredProcesses)
+    }
+  }
+
   private func clearHiddenSelection() {
     guard let selection,
       !filteredProcesses.contains(where: { $0.pid == selection })
@@ -523,33 +493,6 @@ struct ProcessManagementView: View {
     self.selection = nil
     showsInspector = false
     monitor.trackProcess(nil)
-  }
-}
-
-private struct ProcessIdentityView: View {
-  let process: ProcessRow
-
-  var body: some View {
-    HStack(spacing: 9) {
-      SoftwareIcon(software: process.software, size: 24)
-      VStack(alignment: .leading, spacing: 1) {
-        Text(process.name)
-          .lineLimit(1)
-          .help(process.name)
-        HStack(spacing: 4) {
-          if process.software.name.caseInsensitiveCompare(process.name) != .orderedSame {
-            Text(process.software.name)
-              .lineLimit(1)
-            Text("·")
-          }
-          Text(process.software.origin.title)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-      }
-    }
-    .padding(.vertical, 2)
   }
 }
 
@@ -756,8 +699,8 @@ private struct SoftwareIcon: View {
   }
 }
 
-private extension ProcessOrigin {
-  var title: LocalizedStringKey {
+extension ProcessOrigin {
+  fileprivate var title: LocalizedStringKey {
     switch self {
     case .macOSSystem: "System Software or Services"
     case .installedSoftware: "Installed Software"
@@ -766,7 +709,7 @@ private extension ProcessOrigin {
     }
   }
 
-  var systemImage: String {
+  fileprivate var systemImage: String {
     switch self {
     case .macOSSystem: "gearshape.2.fill"
     case .installedSoftware: "app.fill"
@@ -775,7 +718,7 @@ private extension ProcessOrigin {
     }
   }
 
-  var tintColor: Color {
+  fileprivate var tintColor: Color {
     switch self {
     case .macOSSystem, .unknown: .secondary
     case .installedSoftware: .accentColor
