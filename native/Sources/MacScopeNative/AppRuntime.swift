@@ -6,6 +6,7 @@ final class AppRuntime: ObservableObject {
   let monitor: SystemMonitor
   let settings: AppSettings
   let maintenance: MaintenanceStore
+  let startupItems: StartupItemsStore
   let navigation: AppNavigation
 
   private var menuBarController: MenuBarController?
@@ -18,6 +19,7 @@ final class AppRuntime: ObservableObject {
     monitor = SystemMonitor()
     settings = AppSettings()
     maintenance = MaintenanceStore()
+    startupItems = StartupItemsStore()
     navigation = AppNavigation()
 
     let sceneSettingsChanges: [AnyPublisher<Void, Never>] = [

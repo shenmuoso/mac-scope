@@ -30,6 +30,7 @@ struct MacScopeRootView: View {
           }
           Section("System Tools") {
             sidebarRow(.ports)
+            sidebarRow(.startupItems)
             sidebarRow(.downloads)
             sidebarRow(.junk)
             sidebarRow(.applications)
@@ -119,6 +120,8 @@ struct MacScopeRootView: View {
       BatteryHealthView()
     case .ports:
       PortToolView()
+    case .startupItems:
+      StartupItemsView()
     case .downloads:
       DownloadCleanupView()
     case .junk:

@@ -51,6 +51,7 @@ final class MaintenanceStore: ObservableObject {
   }
 
   func scanApplications() {
+    NSApp.activate(ignoringOtherApps: true)
     beginScan(tool: .applications, title: l("Scanning Applications")) { [service] reporter in
       try await service.scanApplications(progress: reporter)
     } apply: { result in
@@ -159,30 +160,50 @@ final class MaintenanceStore: ObservableObject {
 
   func uninstall(
     _ record: ApplicationRecord,
-    selectedIDs: Set<MaintenanceItem.ID>
+    selectedIDs: Set<MaintenanceItem.ID>,
+    selectedStartupConfigurationIDs: Set<ApplicationStartupConfiguration.ID>
   ) {
+    guard !record.isRunning else { return }
+    let selectedConfigurations = record.startupConfigurations.filter {
+      selectedStartupConfigurationIDs.contains($0.id) && $0.canRemove && !$0.isShared
+    }
     let candidates = [record.application] + record.otherCopies + record.residues
-    let items = candidates.filter { selectedIDs.contains($0.id) }
+    let selectedFiles = candidates.filter { selectedIDs.contains($0.id) }
+    let launchConfigurationFiles = selectedConfigurations.flatMap(\.cleanupItems)
+    let items = selectedFiles + launchConfigurationFiles
+    let loginConfigurations = selectedConfigurations.filter { $0.loginItem != nil }
     let home = FileManager.default.homeDirectoryForCurrentUser
     let requiresAdministrator = items.contains { item in
-      item.kind == .application
-        && item.url.standardizedFileURL.path.hasPrefix("/Applications/")
+      let path = item.url.standardizedFileURL.path
+      return (item.kind == .application && path.hasPrefix("/Applications/"))
+        || (item.kind == .startupItem
+          && (path.hasPrefix("/Library/LaunchAgents/")
+            || path.hasPrefix("/Library/LaunchDaemons/")
+            || path.hasPrefix("/Library/PrivilegedHelperTools/")))
     }
     if requiresAdministrator {
       NSApp.activate(ignoringOtherApps: true)
     }
-    beginCleanup(
-      tool: .applications,
+    let roots = [
+      URL(fileURLWithPath: "/Applications", isDirectory: true),
+      home.appendingPathComponent("Applications", isDirectory: true),
+      home.appendingPathComponent("Library", isDirectory: true),
+      URL(fileURLWithPath: "/Library/LaunchAgents", isDirectory: true),
+      URL(fileURLWithPath: "/Library/LaunchDaemons", isDirectory: true),
+      URL(fileURLWithPath: "/Library/PrivilegedHelperTools", isDirectory: true),
+    ]
+    runApplicationUninstall(
       title: l("Uninstalling %@", record.application.name),
       items: items,
-      cacheMode: .trash,
-      roots: [
-        URL(fileURLWithPath: "/Applications", isDirectory: true),
-        home.appendingPathComponent("Applications", isDirectory: true),
-        home.appendingPathComponent("Library", isDirectory: true),
-      ],
+      startupConfigurations: selectedConfigurations,
+      loginConfigurations: loginConfigurations,
+      roots: roots,
       authorize: requiresAdministrator
     )
+  }
+
+  func openAutomationSettings() {
+    SystemPermission.openAutomationSettings()
   }
 
   func releaseMemory() {
@@ -421,6 +442,211 @@ final class MaintenanceStore: ObservableObject {
     }
   }
 
+  private func runApplicationUninstall(
+    title: String,
+    items: [MaintenanceItem],
+    startupConfigurations: [ApplicationStartupConfiguration],
+    loginConfigurations: [ApplicationStartupConfiguration],
+    roots: [URL],
+    authorize: Bool
+  ) {
+    cancelCurrentOperation()
+    let loginEntries = loginConfigurations.map { configuration in
+      ActivityEntry(
+        id: configuration.id,
+        name: configuration.name,
+        path: configuration.targetPath ?? l("Open at Login"),
+        state: .pending,
+        detail: ""
+      )
+    }
+    activity = MaintenanceActivity(
+      id: UUID(),
+      tool: .applications,
+      operation: .cleanup,
+      title: title,
+      phase: .working,
+      completed: 0,
+      total: loginEntries.count + items.count,
+      currentPath: l("Preparing"),
+      entries: loginEntries + items.map {
+        ActivityEntry(
+          id: $0.id,
+          name: $0.name,
+          path: $0.url.path,
+          state: .pending,
+          detail: ""
+        )
+      },
+      reclaimedBytes: 0,
+      failures: [],
+      scanIssues: []
+    )
+
+    let startupService = StartupItemService()
+    operationTask = Task { [weak self, service] in
+      guard let self else { return }
+      let preflightFailures = await service.preflightCleanup(
+        items: items,
+        allowedRoots: roots
+      )
+      guard !Task.isCancelled else { return }
+      if !preflightFailures.isEmpty {
+        for failure in preflightFailures {
+          markActivityEntry(
+            id: failure.item.id,
+            state: .failed,
+            detail: failure.detail
+          )
+        }
+        activity?.phase = .completed
+        activity?.completed = preflightFailures.count
+        activity?.currentPath = l("Uninstall was not started because selected items changed.")
+        activity?.failures = preflightFailures
+        return
+      }
+
+      var completedStartupConfigurationIDs = Set<ApplicationStartupConfiguration.ID>()
+      var startupFailureCount = 0
+      for configuration in loginConfigurations {
+        guard !Task.isCancelled, let loginItem = configuration.loginItem else { continue }
+        markActivityEntry(id: configuration.id, state: .working, detail: "")
+        let result = await startupService.removeLoginItem(loginItem)
+        guard !Task.isCancelled else { return }
+        switch result {
+        case .success:
+          completedStartupConfigurationIDs.insert(configuration.id)
+          markActivityEntry(
+            id: configuration.id,
+            state: .completed,
+            detail: l("Removed from Open at Login")
+          )
+        case .cancelled:
+          startupFailureCount += 1
+          markActivityEntry(
+            id: configuration.id,
+            state: .failed,
+            detail: l("Cancelled")
+          )
+        case .failure(let message):
+          startupFailureCount += 1
+          markActivityEntry(id: configuration.id, state: .failed, detail: message)
+        }
+        activity?.completed = completedStartupConfigurationIDs.count + startupFailureCount
+      }
+
+      let offset = loginConfigurations.count
+      let result = await service.cleanup(
+        items: items,
+        cacheMode: .trash,
+        allowedRoots: roots,
+        authorize: authorize
+      ) { [weak self] progress in
+        await self?.updateApplicationCleanupProgress(progress, offset: offset)
+      }
+      guard !Task.isCancelled else { return }
+
+      let completedFileIDs = Set(result.completed.map(\.id))
+      for configuration in startupConfigurations {
+        let configurationFileIDs = Set(configuration.cleanupItems.map(\.id))
+        if !configurationFileIDs.isEmpty,
+          configurationFileIDs.isSubset(of: completedFileIDs)
+        {
+          completedStartupConfigurationIDs.insert(configuration.id)
+        }
+      }
+
+      if !result.authorizationCancelled {
+        let verification = await startupService.scan()
+        if case .available = verification.loginItemsAccess {
+          for configuration in loginConfigurations
+          where completedStartupConfigurationIDs.contains(configuration.id) {
+            guard let original = configuration.loginItem else { continue }
+            let remains = verification.loginItems.contains {
+              $0.name == original.name && $0.path == original.path
+            }
+            if remains {
+              completedStartupConfigurationIDs.remove(configuration.id)
+              startupFailureCount += 1
+              markActivityEntry(
+                id: configuration.id,
+                state: .failed,
+                detail: l("Still present after uninstall")
+              )
+            }
+          }
+        }
+        for configuration in startupConfigurations
+        where configuration.loginItem == nil
+          && completedStartupConfigurationIDs.contains(configuration.id)
+        {
+          guard let original = configuration.launchItem else { continue }
+          let remains = verification.backgroundItems.contains {
+            $0.plistURL.standardizedFileURL.path
+              == original.plistURL.standardizedFileURL.path
+          }
+          if remains {
+            completedStartupConfigurationIDs.remove(configuration.id)
+            startupFailureCount += 1
+            markActivityEntry(
+              id: configuration.cleanupItems.first?.id ?? configuration.id,
+              state: .failed,
+              detail: l("Still present after uninstall")
+            )
+          }
+        }
+      }
+
+      activity?.phase = result.authorizationCancelled ? .cancelled : .completed
+      activity?.completed = result.authorizationCancelled
+        ? offset + result.completed.count
+        : offset + items.count
+      let issueCount = result.failures.count + startupFailureCount
+      if result.authorizationCancelled {
+        activity?.currentPath = l("Cancelled")
+      } else if issueCount == 0 {
+        let completedLoginCount = loginConfigurations.filter {
+          completedStartupConfigurationIDs.contains($0.id)
+        }.count
+        activity?.currentPath = l(
+          "Completed %lld items",
+          Int64(result.completed.count + completedLoginCount)
+        )
+      } else {
+        activity?.currentPath = l("Completed with %lld issues", Int64(issueCount))
+      }
+      activity?.reclaimedBytes = result.reclaimedBytes
+      activity?.failures = result.failures
+      removeCompleted(result.completed, from: .applications)
+      removeStartupConfigurations(completedStartupConfigurationIDs)
+    }
+  }
+
+  private func updateApplicationCleanupProgress(
+    _ progress: CleanupProgress,
+    offset: Int
+  ) {
+    guard activity?.phase == .working else { return }
+    activity?.completed = offset + progress.completed
+    activity?.total = offset + progress.total
+    activity?.currentPath = progress.item.url.path
+    markActivityEntry(
+      id: progress.item.id,
+      state: progress.state,
+      detail: progress.detail
+    )
+  }
+
+  private func markActivityEntry(
+    id: String,
+    state: ActivityEntryState,
+    detail: String
+  ) {
+    guard let index = activity?.entries.firstIndex(where: { $0.id == id }) else { return }
+    activity?.entries[index].state = state
+    activity?.entries[index].detail = detail
+  }
+
   private func updateCleanupProgress(_ progress: CleanupProgress) {
     guard activity?.phase == .working else { return }
     activity?.completed = progress.completed
@@ -471,6 +697,8 @@ final class MaintenanceStore: ObservableObject {
             application: promoted,
             bundleIdentifier: record.bundleIdentifier,
             version: record.version,
+            startupConfigurations: record.startupConfigurations,
+            loginItemsAccess: record.loginItemsAccess,
             residues: record.residues.filter { !ids.contains($0.id) },
             otherCopies: Array(remainingCopies.dropFirst()),
             isRunning: record.isRunning
@@ -480,6 +708,8 @@ final class MaintenanceStore: ObservableObject {
           application: record.application,
           bundleIdentifier: record.bundleIdentifier,
           version: record.version,
+          startupConfigurations: record.startupConfigurations,
+          loginItemsAccess: record.loginItemsAccess,
           residues: record.residues.filter { !ids.contains($0.id) },
           otherCopies: record.otherCopies.filter { !ids.contains($0.id) },
           isRunning: record.isRunning
@@ -487,6 +717,24 @@ final class MaintenanceStore: ObservableObject {
       }
     case .memory:
       break
+    }
+  }
+
+  private func removeStartupConfigurations(
+    _ ids: Set<ApplicationStartupConfiguration.ID>
+  ) {
+    guard !ids.isEmpty else { return }
+    applications = applications.map { record in
+      ApplicationRecord(
+        application: record.application,
+        bundleIdentifier: record.bundleIdentifier,
+        version: record.version,
+        startupConfigurations: record.startupConfigurations.filter { !ids.contains($0.id) },
+        loginItemsAccess: record.loginItemsAccess,
+        residues: record.residues,
+        otherCopies: record.otherCopies,
+        isRunning: record.isRunning
+      )
     }
   }
 

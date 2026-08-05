@@ -10,6 +10,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   case systemInfo
   case battery
   case ports
+  case startupItems
   case downloads
   case junk
   case applications
@@ -27,6 +28,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     case .systemInfo: "System Information"
     case .battery: "Battery Health"
     case .ports: "Ports"
+    case .startupItems: "Startup Items"
     case .downloads: "Downloads Cleanup"
     case .junk: "Junk Cleanup"
     case .applications: "Applications"
@@ -50,6 +52,8 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
       "Charge, capacity, cycle count, temperature, and electrical condition."
     case .ports:
       "Listening ports and the processes and software using them."
+    case .startupItems:
+      "Open at Login items, background tasks, and startup remnants."
     case .downloads:
       "Installers, archives, and older files in your Downloads folder."
     case .junk:
@@ -73,6 +77,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     case .systemInfo: "desktopcomputer"
     case .battery: "battery.100percent"
     case .ports: "network"
+    case .startupItems: "power"
     case .downloads: "arrow.down.circle"
     case .junk: "trash"
     case .applications: "app.dashed"
@@ -96,6 +101,8 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
       Color(nsColor: .systemGreen)
     case .ports:
       Color(nsColor: .systemBlue)
+    case .startupItems:
+      Color(nsColor: .systemGray)
     case .downloads, .junk, .largeFiles, .duplicates:
       Color(nsColor: .systemRed)
     case .applications:
