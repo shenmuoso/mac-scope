@@ -34,7 +34,7 @@ final class SystemMetricsStore: ObservableObject {
 }
 
 enum ProcessSamplingClient: Hashable, Sendable {
-  case overview
+  case processManagement
   case menuBar
 }
 

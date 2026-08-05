@@ -6,6 +6,7 @@ import SwiftUI
 enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   case overview
   case performancePower
+  case processes
   case systemInfo
   case battery
   case ports
@@ -22,6 +23,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .overview: "Overview"
     case .performancePower: "Performance & Power"
+    case .processes: "Process Management"
     case .systemInfo: "System Information"
     case .battery: "Battery Health"
     case .ports: "Ports"
@@ -37,9 +39,11 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   var pageDescription: LocalizedStringKey {
     switch self {
     case .overview:
-      "Live CPU, memory, disk, network, and process activity."
+      "Live CPU, memory, disk, and network activity."
     case .performancePower:
       "Real-time CPU, power, temperature, and cooling activity."
+    case .processes:
+      "Inspect, group, and manage running processes and software."
     case .systemInfo:
       "Hardware, storage, displays, and connected devices on this Mac."
     case .battery:
@@ -65,6 +69,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .overview: "gauge.with.dots.needle.50percent"
     case .performancePower: "bolt.circle"
+    case .processes: "list.bullet.rectangle"
     case .systemInfo: "desktopcomputer"
     case .battery: "battery.100percent"
     case .ports: "network"
@@ -83,6 +88,8 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
       Color(nsColor: .black)
     case .performancePower:
       Color(nsColor: .systemOrange)
+    case .processes:
+      Color(nsColor: .systemGray)
     case .systemInfo:
       Color(nsColor: .systemGray)
     case .battery, .memory:
@@ -120,7 +127,7 @@ final class AppNavigation: ObservableObject {
   }
 
   func inspectProcess(_ pid: Int32) {
-    destination = .overview
+    destination = .processes
     processInspectionRequest = ProcessInspectionRequest(pid: pid)
   }
 

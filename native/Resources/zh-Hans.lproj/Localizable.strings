@@ -29,7 +29,6 @@
 "1 second" = "1 秒";
 "2 seconds" = "2 秒";
 "5 seconds" = "5 秒";
-"Process rows" = "进程行数";
 "Temperature" = "温度单位";
 "Celsius" = "摄氏度";
 "Fahrenheit" = "华氏度";
@@ -301,9 +300,9 @@
 "Review files before MacScope performs a destructive action." = "在 MacScope 执行破坏性操作前检查相关文件。";
 "MacScope requests access only when a selected operation requires it." = "MacScope 仅在所选操作确有需要时请求权限。";
 "System Metrics" = "系统指标";
-"CPU, temperature, memory, disk, and network values update automatically." = "CPU、温度、内存、磁盘和网络数据会自动更新。";
-"Process Ranking" = "进程排行";
-"Click a table heading to rank processes by the resource that matters now." = "点击表头，即可按当前关注的资源对进程排序。";
+"CPU, memory, disk, and network values update automatically." = "CPU、内存、磁盘和网络数据会自动更新。";
+"Activity History" = "活动历史";
+"Recent system charts make short spikes and sustained activity easier to compare." = "近期系统图表便于比较瞬时峰值和持续活动。";
 "Pause and Refresh" = "暂停与刷新";
 "Pause monitoring to hold the current values, or refresh immediately from the toolbar." = "暂停监控可以保留当前数据，也可以从工具栏立即刷新。";
 "Find a Process" = "查找进程";
@@ -468,7 +467,6 @@
 "Old Download" = "旧文件";
 "Scanning Downloads" = "正在扫描下载文件夹";
 "Cleaning Downloads" = "正在清理下载文件";
-"Live CPU, memory, disk, network, and process activity." = "实时查看 CPU、内存、磁盘、网络和进程活动。";
 "Hardware, storage, displays, and connected devices on this Mac." = "查看这台 Mac 的硬件、存储、显示器和已连接设备。";
 "Charge, capacity, cycle count, temperature, and power activity." = "查看电量、容量、循环次数、温度和功率变化。";
 "Listening ports and the processes and software using them." = "查看监听端口及其所属进程和软件。";
@@ -504,3 +502,14 @@
 "Minimum" = "最低";
 "Target" = "目标";
 "Maximum" = "最高";
+"Live CPU, memory, disk, and network activity." = "实时查看 CPU、内存、磁盘和网络活动。";
+"Inspect, group, and manage running processes and software." = "检查、分类并管理正在运行的进程和软件。";
+"System Load" = "系统负载";
+"Activity Trends" = "活动趋势";
+"Collecting System Activity" = "正在采集系统活动";
+"Read" = "读取";
+"Write" = "写入";
+"%lld of %lld processes" = "显示 %lld 个，共 %lld 个进程";
+"Reading running processes and their resource activity." = "正在读取运行中的进程及其资源活动。";
+"No Matching Processes" = "没有匹配的进程";
+"No processes match the current search and source filter." = "没有进程符合当前搜索内容和来源筛选条件。";

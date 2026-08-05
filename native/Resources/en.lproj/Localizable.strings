@@ -29,7 +29,6 @@
 "1 second" = "1 second";
 "2 seconds" = "2 seconds";
 "5 seconds" = "5 seconds";
-"Process rows" = "Process rows";
 "Temperature" = "Temperature";
 "Celsius" = "Celsius";
 "Fahrenheit" = "Fahrenheit";
@@ -301,9 +300,9 @@
 "Review files before MacScope performs a destructive action." = "Review files before MacScope performs a destructive action.";
 "MacScope requests access only when a selected operation requires it." = "MacScope requests access only when a selected operation requires it.";
 "System Metrics" = "System Metrics";
-"CPU, temperature, memory, disk, and network values update automatically." = "CPU, temperature, memory, disk, and network values update automatically.";
-"Process Ranking" = "Process Ranking";
-"Click a table heading to rank processes by the resource that matters now." = "Click a table heading to rank processes by the resource that matters now.";
+"CPU, memory, disk, and network values update automatically." = "CPU, memory, disk, and network values update automatically.";
+"Activity History" = "Activity History";
+"Recent system charts make short spikes and sustained activity easier to compare." = "Recent system charts make short spikes and sustained activity easier to compare.";
 "Pause and Refresh" = "Pause and Refresh";
 "Pause monitoring to hold the current values, or refresh immediately from the toolbar." = "Pause monitoring to hold the current values, or refresh immediately from the toolbar.";
 "Find a Process" = "Find a Process";
@@ -468,7 +467,6 @@
 "Old Download" = "Old Download";
 "Scanning Downloads" = "Scanning Downloads";
 "Cleaning Downloads" = "Cleaning Downloads";
-"Live CPU, memory, disk, network, and process activity." = "Live CPU, memory, disk, network, and process activity.";
 "Hardware, storage, displays, and connected devices on this Mac." = "Hardware, storage, displays, and connected devices on this Mac.";
 "Charge, capacity, cycle count, temperature, and power activity." = "Charge, capacity, cycle count, temperature, and power activity.";
 "Listening ports and the processes and software using them." = "Listening ports and the processes and software using them.";
@@ -504,3 +502,14 @@
 "Minimum" = "Minimum";
 "Target" = "Target";
 "Maximum" = "Maximum";
+"Live CPU, memory, disk, and network activity." = "Live CPU, memory, disk, and network activity.";
+"Inspect, group, and manage running processes and software." = "Inspect, group, and manage running processes and software.";
+"System Load" = "System Load";
+"Activity Trends" = "Activity Trends";
+"Collecting System Activity" = "Collecting System Activity";
+"Read" = "Read";
+"Write" = "Write";
+"%lld of %lld processes" = "%lld of %lld processes";
+"Reading running processes and their resource activity." = "Reading running processes and their resource activity.";
+"No Matching Processes" = "No Matching Processes";
+"No processes match the current search and source filter." = "No processes match the current search and source filter.";

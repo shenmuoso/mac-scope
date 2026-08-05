@@ -151,8 +151,8 @@ final class AppRuntime: ObservableObject {
     }
     monitor.setMetricsSampling(isMainWindowVisible, for: .mainWindow)
     monitor.setProcessSampling(
-      isMainWindowVisible && navigation.destination == .overview,
-      for: .overview
+      isMainWindowVisible && navigation.destination == .processes,
+      for: .processManagement
     )
   }
 }
