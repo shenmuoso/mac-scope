@@ -3,6 +3,7 @@ import SwiftUI
 struct MacScopeRootView: View {
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
+  @EnvironmentObject private var updateChecker: UpdateChecker
 
   private var destinationSelection: Binding<AppDestination?> {
     Binding(
@@ -90,19 +91,60 @@ struct MacScopeRootView: View {
       Text(item.title)
         .lineLimit(1)
     }
-      .padding(.vertical, 2)
-      .tag(item)
-      .listRowBackground(Color.clear)
+    .padding(.vertical, 2)
+    .tag(item)
+    .listRowBackground(Color.clear)
   }
 
   private var sidebarFooter: some View {
-    Text("Version \(AppMetadata.version)")
-      .monospacedDigit()
-      .font(.caption)
-      .foregroundStyle(.tertiary)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, 14)
-      .padding(.vertical, 10)
+    Group {
+      if let update = updateChecker.availableUpdate {
+        Button(action: updateChecker.downloadAvailableUpdate) {
+          sidebarFooterContent(update: update)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(
+          AppLocalization.string(
+            "A newer version of MacScope is available on GitHub.",
+            language: settings.language
+          )
+        )
+        .accessibilityLabel(downloadTitle(for: update))
+      } else {
+        sidebarFooterContent(update: nil)
+      }
+    }
+    .frame(height: 48)
+    .padding(.horizontal, 14)
+  }
+
+  private func sidebarFooterContent(update: AvailableUpdate?) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text("Version \(AppMetadata.version)")
+        .monospacedDigit()
+        .font(.caption)
+        .foregroundStyle(.tertiary)
+
+      if let update {
+        HStack(spacing: 4) {
+          Image(systemName: "arrow.down.circle.fill")
+          Text(downloadTitle(for: update))
+            .lineLimit(1)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.tint)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+  }
+
+  private func downloadTitle(for update: AvailableUpdate) -> String {
+    AppLocalization.string(
+      "Download %@",
+      language: settings.language,
+      arguments: [update.version]
+    )
   }
 
   @ViewBuilder

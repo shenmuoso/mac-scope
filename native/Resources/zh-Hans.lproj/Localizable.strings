@@ -278,6 +278,8 @@
 "Updated %@" = "更新于 %@";
 "%lld processes" = "%lld 个进程";
 "Version %@" = "版本 %@";
+"Download %@" = "下载 %@";
+"A newer version of MacScope is available on GitHub." = "GitHub 上有新的 MacScope 版本可供下载。";
 "Uninstall %@" = "卸载 %@";
 "About MacScope" = "关于 MacScope";
 "Developer Homepage" = "开发者主页";

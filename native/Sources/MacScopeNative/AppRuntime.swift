@@ -8,6 +8,7 @@ final class AppRuntime: ObservableObject {
   let maintenance: MaintenanceStore
   let startupItems: StartupItemsStore
   let navigation: AppNavigation
+  let updateChecker: UpdateChecker
 
   private var menuBarController: MenuBarController?
   private var openMainWindowHandler: (() -> Void)?
@@ -21,6 +22,7 @@ final class AppRuntime: ObservableObject {
     maintenance = MaintenanceStore()
     startupItems = StartupItemsStore()
     navigation = AppNavigation()
+    updateChecker = UpdateChecker()
 
     let sceneSettingsChanges: [AnyPublisher<Void, Never>] = [
       settings.$language.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
@@ -63,6 +65,7 @@ final class AppRuntime: ObservableObject {
       .store(in: &cancellables)
 
     bindMainWindowVisibility()
+    bindUpdateChecking()
   }
 
   func start() {
@@ -82,6 +85,7 @@ final class AppRuntime: ObservableObject {
     monitor.start()
     maintenance.updateLanguage(settings.language)
     AppIconController.apply(settings.appIconStyle)
+    updateChecker.checkIfNeeded()
 
     DispatchQueue.main.async { [weak self] in
       self?.updateMainWindowSampling()
@@ -133,6 +137,16 @@ final class AppRuntime: ObservableObject {
           }
           self.mainWindowIsClosing = true
           self.updateMainWindowSampling()
+        }
+      }
+      .store(in: &cancellables)
+  }
+
+  private func bindUpdateChecking() {
+    NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+      .sink { [weak updateChecker] _ in
+        Task { @MainActor in
+          updateChecker?.checkIfNeeded()
         }
       }
       .store(in: &cancellables)

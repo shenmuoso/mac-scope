@@ -14,6 +14,7 @@ struct MacScopeNativeApp: App {
         .environmentObject(runtime.maintenance)
         .environmentObject(runtime.startupItems)
         .environmentObject(runtime.navigation)
+        .environmentObject(runtime.updateChecker)
         .environment(\.locale, runtime.settings.language.locale)
         .preferredColorScheme(runtime.settings.appearance.colorScheme)
         .tint(runtime.settings.activeTheme.accentColor)
@@ -23,7 +24,7 @@ struct MacScopeNativeApp: App {
             MainWindowConfigurationView()
             MainWindowOpenActionBridge(runtime: runtime)
           }
-            .allowsHitTesting(false)
+          .allowsHitTesting(false)
         }
     }
     .defaultSize(width: 1_320, height: 800)

@@ -278,6 +278,8 @@
 "Updated %@" = "Updated %@";
 "%lld processes" = "%lld processes";
 "Version %@" = "Version %@";
+"Download %@" = "Download %@";
+"A newer version of MacScope is available on GitHub." = "A newer version of MacScope is available on GitHub.";
 "Uninstall %@" = "Uninstall %@";
 "About MacScope" = "About MacScope";
 "Developer Homepage" = "Developer Homepage";
