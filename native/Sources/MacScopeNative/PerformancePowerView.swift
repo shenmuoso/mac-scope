@@ -5,6 +5,8 @@ struct PerformancePowerView: View {
   @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var metrics: SystemMetricsStore
   @EnvironmentObject private var settings: AppSettings
+  @EnvironmentObject private var fanControl: FanControlManager
+  @State private var showsFanControlConfirmation = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -17,6 +19,9 @@ struct PerformancePowerView: View {
           powerPanel
           thermalPanel
           coolingPanel
+          if metrics.snapshot.cooling.state == .available || fanControl.state != .idle {
+            fanControlPanel
+          }
         }
         .frame(maxWidth: 900)
         .frame(maxWidth: .infinity)
@@ -24,6 +29,20 @@ struct PerformancePowerView: View {
         .padding(.bottom, 28)
       }
       .compactNativeScrollers()
+    }
+    .confirmationDialog(
+      "Start Maximum Cooling?",
+      isPresented: $showsFanControlConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("Start Maximum Cooling") {
+        fanControl.startMaximumCooling(with: metrics.snapshot.cooling)
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text(
+        "MacScope will temporarily run every detected fan at its hardware-reported maximum speed. This increases noise and power use. A macOS administrator authorization dialog will appear."
+      )
     }
     .toolbar {
       ToolbarItemGroup(placement: .navigation) {
@@ -277,6 +296,171 @@ struct PerformancePowerView: View {
         .frame(minHeight: 52)
       }
     }
+  }
+
+  private var fanControlPanel: some View {
+    PerformancePanel(title: "Fan Control", subtitle: fanControlSubtitle) {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(spacing: 12) {
+          Image(systemName: fanControlSystemImage)
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(fanControlColor)
+            .frame(width: 32, height: 32)
+
+          VStack(alignment: .leading, spacing: 3) {
+            Text(fanControlTitle)
+              .font(.headline)
+            Text(fanControlDetail)
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+          }
+
+          Spacer(minLength: 12)
+
+          if case .active = fanControl.state {
+            Button("Restore Automatic Control") {
+              fanControl.stopMaximumCooling()
+            }
+          } else if case .recoveryNeeded = fanControl.state {
+            Button("Restore System Control") {
+              fanControl.restoreSystemControl()
+            }
+            .buttonStyle(.borderedProminent)
+          } else if case .failed = fanControl.state {
+            Button("Dismiss") {
+              fanControl.dismissFailure()
+            }
+          } else if fanControl.isBusy {
+            ProgressView()
+              .controlSize(.small)
+          } else {
+            Button("Start Maximum Cooling") {
+              showsFanControlConfirmation = true
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!fanControl.canStart(with: metrics.snapshot.cooling) || fanControl.isBusy)
+          }
+        }
+
+        if fanControl.state == .idle {
+          Divider()
+          HStack(spacing: 14) {
+            Text("Duration")
+              .font(.subheadline)
+            Picker("Duration", selection: $fanControl.selectedDurationMinutes) {
+              Text("15 Minutes").tag(15)
+              Text("30 Minutes").tag(30)
+              Text("60 Minutes").tag(60)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 330)
+            Spacer()
+          }
+        }
+
+        if let message = fanControl.lastMessage {
+          Label {
+            Text(localized(message))
+          } icon: {
+            Image(systemName: "checkmark.circle")
+          }
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
+
+        if !fanControl.canStart(with: metrics.snapshot.cooling), fanControl.state == .idle {
+          Label(
+            "This Mac reports fan speed, but its writable target range could not be verified. Fan control remains disabled.",
+            systemImage: "lock.shield"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
+
+        Text(
+          "Maximum Cooling never lowers the system-selected fan speed. It stops automatically when the timer ends, MacScope exits or stops responding, the Mac sleeps, or macOS reports serious thermal pressure."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+  }
+
+  private var fanControlTitle: LocalizedStringKey {
+    switch fanControl.state {
+    case .idle: "System Automatic"
+    case .authorizing: "Waiting for Administrator Authorization"
+    case .starting: "Starting Maximum Cooling"
+    case .active: "Maximum Cooling Active"
+    case .stopping: "Restoring System Control"
+    case .recoveryNeeded: "System Control Must Be Restored"
+    case .failed: "Fan Control Unavailable"
+    }
+  }
+
+  private var fanControlDetail: String {
+    switch fanControl.state {
+    case .idle:
+      return localized("macOS currently controls fan speed.")
+    case .authorizing:
+      return localized("Complete the macOS administrator dialog to continue.")
+    case .starting:
+      return localized("Verifying fan modes and target speeds.")
+    case .active(_, let maximumRPM):
+      let remaining = fanControl.remainingSeconds.map(formatRemainingTime) ?? "--:--"
+      if let maximumRPM {
+        return localized(
+          "%@ remaining · up to %@",
+          remaining,
+          DisplayFormat.fanSpeed(Double(maximumRPM)) ?? "--"
+        )
+      }
+      return localized("%@ remaining", remaining)
+    case .stopping:
+      return localized("Waiting for the helper to confirm automatic control.")
+    case .recoveryNeeded(let message):
+      return localizedMessage(message, fallback: "The previous session did not confirm a safe reset.")
+    case .failed(let message):
+      return localizedMessage(message, fallback: "The protected operation did not complete.")
+    }
+  }
+
+  private var fanControlSubtitle: LocalizedStringKey {
+    switch fanControl.state {
+    case .active: "Timed Session"
+    case .recoveryNeeded: "Action Required"
+    case .authorizing, .starting, .stopping: "Safety First"
+    case .idle, .failed: "Experimental"
+    }
+  }
+
+  private var fanControlSystemImage: String {
+    switch fanControl.state {
+    case .active: "fan.fill"
+    case .recoveryNeeded, .failed: "exclamationmark.triangle.fill"
+    case .authorizing, .starting, .stopping: "gearshape.2.fill"
+    case .idle: "checkmark.shield.fill"
+    }
+  }
+
+  private var fanControlColor: Color {
+    switch fanControl.state {
+    case .active: .blue
+    case .recoveryNeeded, .failed: .orange
+    case .authorizing, .starting, .stopping: .secondary
+    case .idle: .green
+    }
+  }
+
+  private func formatRemainingTime(_ seconds: Int) -> String {
+    String(format: "%d:%02d", max(0, seconds) / 60, max(0, seconds) % 60)
+  }
+
+  private func localizedMessage(_ message: String?, fallback: String) -> String {
+    guard let message, !message.isEmpty else { return localized(fallback) }
+    return localized(message)
   }
 
   private func fanDetailValue(_ title: LocalizedStringKey, value: Double?) -> some View {

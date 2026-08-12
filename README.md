@@ -21,18 +21,18 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.11-1677ff" alt="Version 0.4.11">
+  <img src="https://img.shields.io/badge/version-0.4.12-1677ff" alt="Version 0.4.12">
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI%20%2B%20AppKit-Native-f05138?logo=swift" alt="SwiftUI and AppKit">
   <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="English and Simplified Chinese">
 </p>
 
 > [!TIP]
-> **0.4.11 新增性能与功耗看板、启动项管理和更新提示。** 查看整机功耗、充电功率、温度与风扇转速，识别失效启动项；重新设计的概览和独立进程管理也带来了更清晰、更流畅的监控体验。
+> **0.4.12 新增实验性的最大散热控制。** 在支持的有风扇 Mac 上，可以让所有风扇定时运行于硬件报告的最高转速；到期、主动停止、应用退出、失去心跳、Mac 休眠或热状态异常时会请求恢复 macOS 自动控制。
 
 MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界面中。它由 SwiftUI 与 AppKit 构建，不包含 Electron、内置浏览器或额外运行时；无需终端、Python 和 Homebrew，安装后即可使用。
 
-![MacScope 0.4.11 系统概览](.github/assets/macscope-preview.png)
+![MacScope 0.4.12 系统概览](.github/assets/macscope-preview.png)
 
 ## 为什么选择 MacScope
 
@@ -76,6 +76,8 @@ MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界
 - 同时查看 CPU 占用、整机功耗、充电功率、适配器输入、SoC 温度和风扇转速。
 - 使用最近 60 秒趋势图分别呈现 CPU、功耗、温度和散热变化。
 - 列出每个可用风扇的当前、最低和最高转速；无风扇机型和系统未暴露数据时会显示明确状态。
+- 在能够读取并回验风扇目标值的机型上，可选择 15、30 或 60 分钟“最大散热”；启动时由 macOS 显示原生管理员授权框。
+- 最大散热只会把所有风扇联动提升到硬件报告的最高转速，不支持任意转速，也不会降低 macOS 当前选择的风扇速度。
 - 整机功耗和充电功率可以按需加入菜单栏紧凑指标与菜单栏看板，默认均不启用。
 
 ### 进程监控与管理
@@ -215,6 +217,7 @@ MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界
 - 只有可重建缓存和开发者文件可以在设置允许时永久删除。
 - 某些用户资源库路径需要“完全磁盘访问权限”，可从“设置 > 权限管理”打开对应系统设置。
 - 移除受保护应用或释放文件缓存时，MacScope 会在执行前立即显示 macOS 标准管理员授权对话框。
+- 启动或恢复风扇控制时同样使用 macOS 标准管理员授权对话框；临时 Helper 经过哈希校验后从 `/var/tmp` 运行，结束后删除，不安装常驻 root 服务。
 - MacScope 不读取、不接收也不保存管理员密码。
 - 扫描会跳过符号链接和应用包内部，避免越过用户选择的目录边界。
 
@@ -258,6 +261,10 @@ macOS 会保护部分用户资源库目录。MacScope 只会明确提示权限�
 
 MacScope 只显示当前机型和 macOS 实际暴露的传感器数据。无风扇 Mac、未连接电源或系统未提供对应读数时，不会使用估算值填充。
 
+### 最大散热为什么显示不可用？
+
+0.4.12 只在 MacScope 能读取风扇数量、硬件最高转速和目标转速，并能在授权后回读验证写入结果时开放控制。无风扇 Mac、SMC 键格式未知或系统拒绝写入时会保持只读。该功能依赖 Apple 未公开的 SMC 接口，属于实验性功能，可能因机型或 macOS 更新而不可用。
+
 ## 从源码构建
 
 需要 macOS 13+、Xcode Command Line Tools，以及推荐的 Swift 6 工具链。
@@ -283,7 +290,7 @@ native/scripts/build_dmg.sh release
 默认输出：
 
 ```text
-native/build/MacScope-0.4.11.dmg
+native/build/MacScope-0.4.12.dmg
 ```
 
 仓库仍保留早期 Python/Textual 终端版本用于兼容与历史参考，但它不是当前原生应用的运行依赖。

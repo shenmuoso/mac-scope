@@ -81,6 +81,59 @@ enum SystemPermission {
     return authorizationResult(for: result)
   }
 
+  static func launchFanControlHelperWithAdministratorAuthorization(
+    helperURL: URL,
+    expectedSHA256: String,
+    mode: String,
+    duration: TimeInterval,
+    ownerPID: Int32,
+    ownerUID: UInt32,
+    sessionURL: URL
+  ) -> AdministratorAuthorizationResult {
+    guard
+      helperURL.isFileURL,
+      FileManager.default.isExecutableFile(atPath: helperURL.path),
+      expectedSHA256.count == 64,
+      expectedSHA256.allSatisfy({ $0.isHexDigit }),
+      mode == "maximum" || mode == "restore",
+      [900, 1800, 3600].contains(duration),
+      ownerPID > 1,
+      ownerUID > 0,
+      sessionURL.isFileURL
+    else {
+      return .failure("The fan-control helper could not be validated.")
+    }
+
+    let script = [
+      "on run argv",
+      "set helperPath to item 1 of argv",
+      "set expectedHash to item 2 of argv",
+      "set helperMode to item 3 of argv",
+      "set durationValue to item 4 of argv",
+      "set ownerPID to item 5 of argv",
+      "set ownerUID to item 6 of argv",
+      "set sessionPath to item 7 of argv",
+      "set runnerScript to \"\\\"$1/helper\\\" --mode \\\"$2\\\" --duration \\\"$3\\\" --owner-pid \\\"$4\\\" --owner-uid \\\"$5\\\" --session \\\"$6\\\"; result=$?; /bin/rm -rf \\\"$1\\\"; exit $result\"",
+      "set commandText to \"set -eu; helperDir=$(/usr/bin/mktemp -d /var/tmp/com.shenmuoso.macscope.fancontrol.XXXXXX); cleanup() { /bin/rm -rf \\\"$helperDir\\\"; }; trap cleanup EXIT HUP INT TERM; /usr/bin/install -o root -g wheel -m 700 \" & quoted form of helperPath & \" \\\"$helperDir/helper\\\"; actualHash=$(/usr/bin/shasum -a 256 \\\"$helperDir/helper\\\" | /usr/bin/awk '{print $1}'); if [ \\\"$actualHash\\\" != \" & quoted form of expectedHash & \" ]; then exit 65; fi; trap - EXIT HUP INT TERM; /usr/bin/nohup /bin/sh -c \" & quoted form of runnerScript & \" fan-runner \\\"$helperDir\\\" \" & quoted form of helperMode & \" \" & quoted form of durationValue & \" \" & quoted form of ownerPID & \" \" & quoted form of ownerUID & \" \" & quoted form of sessionPath & \" </dev/null >/dev/null 2>&1 &\"",
+      "do shell script commandText with administrator privileges",
+      "end run",
+    ]
+    return authorizationResult(
+      for: runAppleScript(
+        script,
+        arguments: [
+          helperURL.path,
+          expectedSHA256.lowercased(),
+          mode,
+          String(Int(duration)),
+          String(ownerPID),
+          String(ownerUID),
+          sessionURL.path,
+        ]
+      )
+    )
+  }
+
   static func setStartupItemEnabledWithAdministratorAuthorization(
     _ isEnabled: Bool,
     serviceTarget: String,

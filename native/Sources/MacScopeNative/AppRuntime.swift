@@ -9,6 +9,7 @@ final class AppRuntime: ObservableObject {
   let startupItems: StartupItemsStore
   let navigation: AppNavigation
   let updateChecker: UpdateChecker
+  let fanControl: FanControlManager
 
   private var menuBarController: MenuBarController?
   private var openMainWindowHandler: (() -> Void)?
@@ -23,6 +24,7 @@ final class AppRuntime: ObservableObject {
     startupItems = StartupItemsStore()
     navigation = AppNavigation()
     updateChecker = UpdateChecker()
+    fanControl = FanControlManager()
 
     let sceneSettingsChanges: [AnyPublisher<Void, Never>] = [
       settings.$language.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
@@ -66,6 +68,7 @@ final class AppRuntime: ObservableObject {
 
     bindMainWindowVisibility()
     bindUpdateChecking()
+    bindFanControlSafetyEvents()
   }
 
   func start() {
@@ -85,7 +88,7 @@ final class AppRuntime: ObservableObject {
     monitor.start()
     maintenance.updateLanguage(settings.language)
     AppIconController.apply(settings.appIconStyle)
-    updateChecker.checkIfNeeded()
+    updateChecker.checkOnLaunch()
 
     DispatchQueue.main.async { [weak self] in
       self?.updateMainWindowSampling()
@@ -147,6 +150,30 @@ final class AppRuntime: ObservableObject {
       .sink { [weak updateChecker] _ in
         Task { @MainActor in
           updateChecker?.checkIfNeeded()
+        }
+      }
+      .store(in: &cancellables)
+  }
+
+  private func bindFanControlSafetyEvents() {
+    NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
+      .sink { [weak fanControl] _ in
+        fanControl?.prepareForApplicationExit()
+      }
+      .store(in: &cancellables)
+
+    NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
+      .sink { [weak fanControl] _ in
+        Task { @MainActor in
+          fanControl?.prepareForSleep()
+        }
+      }
+      .store(in: &cancellables)
+
+    NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
+      .sink { [weak fanControl] _ in
+        Task { @MainActor in
+          fanControl?.resumeAfterWake()
         }
       }
       .store(in: &cancellables)

@@ -17,6 +17,8 @@ enum UpdateCheckState: Equatable, Sendable {
   case available(AvailableUpdate)
 }
 
+typealias UpdateReleaseFetcher = @MainActor () async throws -> GitHubRelease
+
 struct GitHubRelease: Decodable, Sendable {
   struct Asset: Decodable, Sendable {
     let name: String
@@ -197,6 +199,8 @@ final class UpdateChecker: ObservableObject {
   }
 
   @Published private(set) var state = UpdateCheckState.idle
+  @Published private(set) var isChecking = false
+  @Published private(set) var lastCheckFailed = false
 
   var availableUpdate: AvailableUpdate? {
     guard case .available(let update) = state else { return nil }
@@ -205,17 +209,28 @@ final class UpdateChecker: ObservableObject {
 
   private let defaults: UserDefaults
   private let currentVersion: String
+  private let releaseFetcher: UpdateReleaseFetcher
   private var checkTask: Task<Void, Never>?
   private var lastAttemptAt: Date?
   private var hasCachedResult = false
 
   init(
     defaults: UserDefaults = .standard,
-    currentVersion: String = AppMetadata.version
+    currentVersion: String = AppMetadata.version,
+    releaseFetcher: UpdateReleaseFetcher? = nil
   ) {
     self.defaults = defaults
     self.currentVersion = currentVersion
+    self.releaseFetcher = releaseFetcher ?? Self.fetchLatestRelease
     restoreCachedResult()
+  }
+
+  func checkOnLaunch() {
+    checkIfNeeded(force: true)
+  }
+
+  func checkNow() {
+    checkIfNeeded(force: true)
   }
 
   func checkIfNeeded(force: Bool = false) {
@@ -236,14 +251,20 @@ final class UpdateChecker: ObservableObject {
 
     lastAttemptAt = now
     let fallbackState = state
+    isChecking = true
+    lastCheckFailed = false
     if availableUpdate == nil {
       state = .checking
     }
 
     checkTask = Task { [weak self] in
       guard let self else { return }
+      defer {
+        self.isChecking = false
+        self.checkTask = nil
+      }
       do {
-        let release = try await Self.fetchLatestRelease()
+        let release = try await self.releaseFetcher()
         guard
           let resolution = UpdateReleaseResolver.resolve(
             release: release,
@@ -256,9 +277,9 @@ final class UpdateChecker: ObservableObject {
       } catch is CancellationError {
         self.state = fallbackState
       } catch {
+        self.lastCheckFailed = true
         self.state = fallbackState == .checking ? .idle : fallbackState
       }
-      self.checkTask = nil
     }
   }
 
@@ -321,8 +342,11 @@ final class UpdateChecker: ObservableObject {
     else {
       throw CheckError.invalidResponse
     }
-    var request = URLRequest(url: url)
-    request.timeoutInterval = 15
+    var request = URLRequest(
+      url: url,
+      cachePolicy: .reloadIgnoringLocalCacheData,
+      timeoutInterval: 15
+    )
     request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
     request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
     request.setValue("MacScope/\(AppMetadata.version)", forHTTPHeaderField: "User-Agent")

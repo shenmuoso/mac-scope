@@ -50,6 +50,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 struct SettingsView: View {
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var metrics: SystemMetricsStore
+  @EnvironmentObject private var updateChecker: UpdateChecker
   @Environment(\.openWindow) private var openWindow
 
   @StateObject private var permissionManager = PermissionManager()
@@ -574,6 +575,37 @@ struct SettingsView: View {
         .padding(.vertical, 6)
       }
 
+      Section("Software Update") {
+        VStack(alignment: .leading, spacing: 12) {
+          softwareUpdateStatus
+
+          HStack(spacing: 8) {
+            Button(action: updateChecker.checkNow) {
+              Label("Check for Updates", systemImage: "arrow.clockwise")
+            }
+            .disabled(updateChecker.isChecking)
+
+            if let update = updateChecker.availableUpdate {
+              Button(action: updateChecker.downloadAvailableUpdate) {
+                Label {
+                  Text(
+                    AppLocalization.string(
+                      "Download %@",
+                      language: settings.language,
+                      arguments: [update.version]
+                    )
+                  )
+                } icon: {
+                  Image(systemName: "arrow.down.circle.fill")
+                }
+              }
+              .buttonStyle(.borderedProminent)
+            }
+          }
+        }
+        .padding(.vertical, 4)
+      }
+
       Section("Developer Homepage") {
         Link(destination: AppLinks.author) {
           GitHubLinkLabel(title: "Author: shenmuoso")
@@ -601,6 +633,56 @@ struct SettingsView: View {
     }
     .formStyle(.grouped)
     .padding(8)
+  }
+
+  @ViewBuilder
+  private var softwareUpdateStatus: some View {
+    if updateChecker.isChecking {
+      HStack(spacing: 10) {
+        ProgressView()
+          .controlSize(.small)
+        Text("Checking for Updates...")
+      }
+    } else if updateChecker.lastCheckFailed {
+      HStack(alignment: .top, spacing: 10) {
+        Image(systemName: "exclamationmark.triangle.fill")
+          .foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: 2) {
+          Text("Unable to Check for Updates")
+            .fontWeight(.medium)
+          Text("Check your internet connection and try again.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    } else if let update = updateChecker.availableUpdate {
+      HStack(alignment: .top, spacing: 10) {
+        Image(systemName: "arrow.down.circle.fill")
+          .foregroundStyle(.blue)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(
+            AppLocalization.string(
+              "MacScope %@ is available.",
+              language: settings.language,
+              arguments: [update.version]
+            )
+          )
+          .fontWeight(.medium)
+          Text("A newer version of MacScope is available on GitHub.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    } else if updateChecker.state == .upToDate {
+      Label("MacScope is up to date.", systemImage: "checkmark.circle.fill")
+        .foregroundStyle(.green)
+    } else {
+      Label(
+        "Check GitHub for the latest MacScope release.",
+        systemImage: "arrow.triangle.2.circlepath"
+      )
+      .foregroundStyle(.secondary)
+    }
   }
 
   private func addScanFolders() {

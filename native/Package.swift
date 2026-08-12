@@ -8,7 +8,8 @@ let package = Package(
     .macOS(.v13)
   ],
   products: [
-    .executable(name: "MacScopeNative", targets: ["MacScopeNative"])
+    .executable(name: "MacScopeNative", targets: ["MacScopeNative"]),
+    .executable(name: "MacScopeFanControlHelper", targets: ["MacScopeFanControlHelper"]),
   ],
   dependencies: [
     .package(
@@ -24,6 +25,12 @@ let package = Package(
         .linkedFramework("IOKit"),
         .linkedFramework("Security"),
         .linkedFramework("ServiceManagement"),
+      ]
+    ),
+    .executableTarget(
+      name: "MacScopeFanControlHelper",
+      linkerSettings: [
+        .linkedFramework("IOKit")
       ]
     ),
     .testTarget(
