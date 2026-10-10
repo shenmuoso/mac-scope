@@ -100,25 +100,16 @@ struct SettingsView: View {
           .padding(.horizontal, 14)
           .padding(.vertical, 10)
       }
-      .background {
-        SidebarMaterialView(
-          isEnabled: settings.sidebarTransparencyEnabled,
-          transparency: settings.sidebarTransparency
-        )
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-      }
+      .appSidebarBackground()
       .navigationSplitViewColumnWidth(min: 180, ideal: 205, max: 230)
     } detail: {
       settingsDetail
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-          Color(nsColor: .windowBackgroundColor)
-            .ignoresSafeArea()
-        }
+        .appDetailBackground()
         .navigationTitle(activePane.title)
     }
     .navigationSplitViewStyle(.balanced)
+    .appSplitWindowStyle()
     .alert("Reset all settings?", isPresented: $confirmsReset) {
       Button("Reset", role: .destructive, action: settings.resetAll)
       Button("Cancel", role: .cancel) {}
@@ -198,24 +189,21 @@ struct SettingsView: View {
           Text("Dark").tag(AppAppearance.dark)
         }
         .pickerStyle(.segmented)
+      }
 
-        Toggle("Translucent sidebar", isOn: $settings.sidebarTransparencyEnabled)
-
-        LabeledContent("Sidebar transparency") {
-          HStack(spacing: 10) {
-            Slider(value: $settings.sidebarTransparency, in: 0...1, step: 0.05)
-              .frame(width: 190)
-            Text(settings.sidebarTransparency, format: .percent.precision(.fractionLength(0)))
-              .foregroundStyle(.secondary)
-              .monospacedDigit()
-              .frame(width: 42, alignment: .trailing)
+      Section("Liquid Glass") {
+        Picker("Material finish", selection: $settings.liquidGlassStyle) {
+          ForEach(LiquidGlassStyle.allCases) { style in
+            Text(LocalizedStringKey(style.title)).tag(style)
           }
         }
-        .disabled(!settings.sidebarTransparencyEnabled)
+        .pickerStyle(.segmented)
+
+        Toggle("Translucent sidebar", isOn: $settings.sidebarTransparencyEnabled)
       }
 
       Section("Colors") {
-        Picker("Theme", selection: $settings.themeID) {
+        Picker("Accent palette", selection: $settings.themeID) {
           ForEach(ThemePalette.builtIns) { theme in
             HStack {
               HStack(spacing: 2) {
@@ -233,24 +221,15 @@ struct SettingsView: View {
       }
 
       Section("Dock Icon") {
-        HStack(spacing: 18) {
-          AppIconChoice(
-            style: .minimal,
-            title: "Minimal",
-            isSelected: settings.appIconStyle == .minimal
-          ) {
-            settings.appIconStyle = .minimal
-          }
-          AppIconChoice(
-            style: .detailed,
-            title: "Detailed",
-            isSelected: settings.appIconStyle == .detailed
-          ) {
-            settings.appIconStyle = .detailed
-          }
+        Toggle("Show Dock icon", isOn: $settings.dockIconVisible)
+          .help("Hiding the Dock icon also removes MacScope from the app switcher. The menu bar stays available.")
+
+        Picker("Icon appearance", selection: $settings.dockIconAppearance) {
+          Text("Follow appearance").tag(DockIconAppearance.automatic)
+          Text("Light").tag(DockIconAppearance.light)
+          Text("Dark").tag(DockIconAppearance.dark)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 4)
+        .pickerStyle(.segmented)
       }
     }
     .formStyle(.grouped)
@@ -312,6 +291,7 @@ struct SettingsView: View {
 
       Section("Dashboard") {
         Toggle("Colorful mode", isOn: $settings.menuBarColorfulMode)
+        Toggle("Hide dashboard when pointer leaves", isOn: $settings.menuBarAutoHide)
 
         ForEach(settings.orderedMenuBarModules) { module in
           let isSelected = settings.menuBarModules.contains(module)
@@ -557,13 +537,8 @@ struct SettingsView: View {
     Form {
       Section {
         HStack(spacing: 14) {
-          Image(
-            nsImage: AppIconController.image(for: settings.appIconStyle)
-              ?? NSApp.applicationIconImage
-          )
-          .resizable()
-          .aspectRatio(contentMode: .fit)
-          .frame(width: 64, height: 64)
+          AppIconImage()
+            .frame(width: 64, height: 64)
           VStack(alignment: .leading, spacing: 4) {
             Text("MacScope")
               .font(.title2.weight(.semibold))
@@ -741,47 +716,5 @@ private struct MenuBarConfigurationRow: View {
       .help("Move Down")
       .disabled(!canMoveDown)
     }
-  }
-}
-
-private struct AppIconChoice: View {
-  let style: AppIconStyle
-  let title: LocalizedStringKey
-  let isSelected: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      VStack(spacing: 7) {
-        Image(nsImage: AppIconController.image(for: style) ?? NSApp.applicationIconImage)
-          .resizable()
-          .aspectRatio(contentMode: .fit)
-          .frame(width: 58, height: 58)
-
-        Label {
-          Text(title)
-            .foregroundStyle(.primary)
-        } icon: {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-        }
-        .font(.callout)
-      }
-      .frame(width: 116, height: 92)
-      .background {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
-      }
-      .overlay {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .stroke(
-            isSelected ? Color.accentColor : Color.secondary.opacity(0.22),
-            lineWidth: isSelected ? 1.5 : 1
-          )
-      }
-      .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-    .buttonStyle(.plain)
-    .accessibilityAddTraits(isSelected ? .isSelected : [])
   }
 }

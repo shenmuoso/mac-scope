@@ -12,7 +12,7 @@ struct ThemePalette: Hashable, Identifiable, Sendable {
 
   static let system = ThemePalette(
     id: "system",
-    name: "System",
+    name: "System Accent",
     accentHex: "#0A84FF",
     cpuHex: "#0A84FF",
     memoryHex: "#30D158",
@@ -73,15 +73,5 @@ extension Color {
       alpha = 1
     }
     self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
-  }
-}
-
-extension AppAppearance {
-  var colorScheme: ColorScheme? {
-    switch self {
-    case .system: nil
-    case .light: .light
-    case .dark: .dark
-    }
   }
 }

@@ -402,6 +402,8 @@ private struct ApplicationUninstallView: View {
         }
       }
       .listStyle(.inset)
+      .scrollContentBackground(.hidden)
+      .compactNativeScrollers(clearsBackground: true)
 
       Divider()
       HStack(spacing: 12) {
@@ -430,6 +432,7 @@ private struct ApplicationUninstallView: View {
       .padding(12)
     }
     .frame(width: 720, height: 590)
+    .appSheetMaterial()
     .onChange(of: allCopiesSelected) { allSelected in
       if !allSelected {
         selectedIDs.subtract(currentRecord.residues.map(\.id))

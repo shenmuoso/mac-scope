@@ -17,16 +17,26 @@ enum AppAppearance: String, CaseIterable, Identifiable, Sendable {
   var id: String { rawValue }
 }
 
-enum AppIconStyle: String, CaseIterable, Identifiable, Sendable {
-  case minimal
-  case detailed
+enum DockIconAppearance: String, CaseIterable, Identifiable, Sendable {
+  case automatic
+  case light
+  case dark
+
+  var id: String { rawValue }
+}
+
+enum LiquidGlassStyle: String, CaseIterable, Identifiable, Sendable {
+  case glass
+  case balanced
+  case frosted
 
   var id: String { rawValue }
 
-  var resourceName: String {
+  var title: String {
     switch self {
-    case .minimal: "MacScope"
-    case .detailed: "MacScopeDetailed"
+    case .glass: "Glass"
+    case .balanced: "Balanced"
+    case .frosted: "Frosted"
     }
   }
 }
@@ -50,7 +60,8 @@ final class AppSettings: ObservableObject {
   private enum Key {
     static let language = "native.language"
     static let appearance = "native.appearance"
-    static let appIconStyle = "native.appIconStyle"
+    static let dockIconVisible = "native.dockIconVisible"
+    static let dockIconAppearance = "native.dockIconAppearance"
     static let menuBarEnabled = "native.menuBarEnabled"
     static let menuBarDisplayMode = "native.menuBarDisplayMode"
     static let menuBarMetrics = "native.menuBarMetrics"
@@ -58,8 +69,9 @@ final class AppSettings: ObservableObject {
     static let menuBarProcessSort = "native.menuBarProcessSort"
     static let menuBarProcessLimit = "native.menuBarProcessLimit"
     static let menuBarColorfulMode = "native.menuBarColorfulMode"
+    static let menuBarAutoHide = "native.menuBarAutoHide"
+    static let liquidGlassStyle = "native.liquidGlassStyle"
     static let sidebarTransparencyEnabled = "native.sidebarTransparencyEnabled"
-    static let sidebarTransparency = "native.sidebarTransparency"
     static let refreshInterval = "native.refreshInterval"
     static let refreshIntervalDefault2Applied = "native.refreshIntervalDefault2Applied"
     static let temperatureUnit = "native.temperatureUnit"
@@ -80,15 +92,22 @@ final class AppSettings: ObservableObject {
     didSet { defaults.set(appearance.rawValue, forKey: Key.appearance) }
   }
 
-  @Published var appIconStyle: AppIconStyle {
+  @Published var menuBarEnabled: Bool {
     didSet {
-      defaults.set(appIconStyle.rawValue, forKey: Key.appIconStyle)
-      AppIconController.apply(appIconStyle)
+      defaults.set(menuBarEnabled, forKey: Key.menuBarEnabled)
+      if !menuBarEnabled, !dockIconVisible { dockIconVisible = true }
     }
   }
 
-  @Published var menuBarEnabled: Bool {
-    didSet { defaults.set(menuBarEnabled, forKey: Key.menuBarEnabled) }
+  @Published var dockIconVisible: Bool {
+    didSet {
+      defaults.set(dockIconVisible, forKey: Key.dockIconVisible)
+      if !dockIconVisible, !menuBarEnabled { menuBarEnabled = true }
+    }
+  }
+
+  @Published var dockIconAppearance: DockIconAppearance {
+    didSet { defaults.set(dockIconAppearance.rawValue, forKey: Key.dockIconAppearance) }
   }
 
   @Published var menuBarDisplayMode: MenuBarDisplayMode {
@@ -115,12 +134,16 @@ final class AppSettings: ObservableObject {
     didSet { defaults.set(menuBarColorfulMode, forKey: Key.menuBarColorfulMode) }
   }
 
+  @Published var menuBarAutoHide: Bool {
+    didSet { defaults.set(menuBarAutoHide, forKey: Key.menuBarAutoHide) }
+  }
+
   @Published var sidebarTransparencyEnabled: Bool {
     didSet { defaults.set(sidebarTransparencyEnabled, forKey: Key.sidebarTransparencyEnabled) }
   }
 
-  @Published var sidebarTransparency: Double {
-    didSet { defaults.set(sidebarTransparency, forKey: Key.sidebarTransparency) }
+  @Published var liquidGlassStyle: LiquidGlassStyle {
+    didSet { defaults.set(liquidGlassStyle.rawValue, forKey: Key.liquidGlassStyle) }
   }
 
   @Published var refreshInterval: Double {
@@ -169,11 +192,14 @@ final class AppSettings: ObservableObject {
     self.defaults = defaults
     language = AppLanguage(rawValue: defaults.string(forKey: Key.language) ?? "") ?? .english
     appearance = AppAppearance(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .system
-    appIconStyle =
-      AppIconStyle(rawValue: defaults.string(forKey: Key.appIconStyle) ?? "") ?? .minimal
+    defaults.removeObject(forKey: "native.appIconStyle")
     menuBarEnabled =
       defaults.object(forKey: Key.menuBarEnabled) == nil
       ? true : defaults.bool(forKey: Key.menuBarEnabled)
+    dockIconVisible = defaults.object(forKey: Key.dockIconVisible) == nil
+      ? true : defaults.bool(forKey: Key.dockIconVisible)
+    dockIconAppearance =
+      DockIconAppearance(rawValue: defaults.string(forKey: Key.dockIconAppearance) ?? "") ?? .automatic
     menuBarDisplayMode =
       MenuBarDisplayMode(rawValue: defaults.string(forKey: Key.menuBarDisplayMode) ?? "")
       ?? .compact
@@ -201,14 +227,13 @@ final class AppSettings: ObservableObject {
       [3, 5, 8, 10].contains(savedMenuBarProcessLimit)
       ? savedMenuBarProcessLimit : 5
     menuBarColorfulMode = defaults.bool(forKey: Key.menuBarColorfulMode)
+    menuBarAutoHide = defaults.object(forKey: Key.menuBarAutoHide) == nil
+      ? true : defaults.bool(forKey: Key.menuBarAutoHide)
     sidebarTransparencyEnabled =
       defaults.object(forKey: Key.sidebarTransparencyEnabled) == nil
       ? true : defaults.bool(forKey: Key.sidebarTransparencyEnabled)
-    if defaults.object(forKey: Key.sidebarTransparency) == nil {
-      sidebarTransparency = 0.7
-    } else {
-      sidebarTransparency = min(1, max(0, defaults.double(forKey: Key.sidebarTransparency)))
-    }
+    liquidGlassStyle =
+      LiquidGlassStyle(rawValue: defaults.string(forKey: Key.liquidGlassStyle) ?? "") ?? .glass
 
     let savedInterval = defaults.double(forKey: Key.refreshInterval)
     if !defaults.bool(forKey: Key.refreshIntervalDefault2Applied), savedInterval == 1 {
@@ -246,12 +271,14 @@ final class AppSettings: ObservableObject {
     confirmsCleanup =
       defaults.object(forKey: Key.confirmsCleanup) == nil
       ? true : defaults.bool(forKey: Key.confirmsCleanup)
+    if !dockIconVisible, !menuBarEnabled { menuBarEnabled = true }
   }
 
   func resetAll() {
     language = .english
     appearance = .system
-    appIconStyle = .minimal
+    dockIconVisible = true
+    dockIconAppearance = .automatic
     menuBarEnabled = true
     menuBarDisplayMode = .compact
     menuBarMetrics = [.cpu, .memory]
@@ -259,8 +286,9 @@ final class AppSettings: ObservableObject {
     menuBarProcessSort = .cpu
     menuBarProcessLimit = 5
     menuBarColorfulMode = false
+    menuBarAutoHide = true
     sidebarTransparencyEnabled = true
-    sidebarTransparency = 0.7
+    liquidGlassStyle = .glass
     refreshInterval = 2
     temperatureUnit = .celsius
     themeID = ThemePalette.system.id

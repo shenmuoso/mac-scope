@@ -111,7 +111,7 @@ struct MaintenanceActivityInlineView: View {
       }
       .frame(maxWidth: 960)
       .frame(maxWidth: .infinity)
-      .background(.bar)
+      .appMaterial(.toolbar)
       .transition(.opacity)
       .sheet(isPresented: $showsResults) {
         MaintenanceActivityResultsView(
@@ -562,7 +562,8 @@ private struct MaintenanceActivityResultsView: View {
         resultRow(entry)
       }
       .listStyle(.inset)
-      .compactNativeScrollers()
+      .scrollContentBackground(.hidden)
+      .compactNativeScrollers(clearsBackground: true)
 
       Divider()
       HStack(spacing: 8) {
@@ -575,9 +576,9 @@ private struct MaintenanceActivityResultsView: View {
       }
       .padding(.horizontal, 16)
       .frame(height: 52)
-      .background(.bar)
     }
     .frame(width: 760, height: 520)
+    .appSheetMaterial()
   }
 
   private var summaryStrip: some View {
@@ -613,7 +614,6 @@ private struct MaintenanceActivityResultsView: View {
     }
     .padding(.horizontal, 20)
     .frame(height: 68)
-    .background(Color(nsColor: .controlBackgroundColor))
   }
 
   private func summaryItem(

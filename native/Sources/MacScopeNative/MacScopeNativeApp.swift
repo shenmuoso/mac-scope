@@ -11,18 +11,18 @@ struct MacScopeNativeApp: App {
         .environmentObject(runtime.monitor)
         .environmentObject(runtime.monitor.metrics)
         .environmentObject(runtime.settings)
+        .environmentObject(runtime.iconController)
         .environmentObject(runtime.maintenance)
         .environmentObject(runtime.startupItems)
         .environmentObject(runtime.navigation)
         .environmentObject(runtime.updateChecker)
         .environmentObject(runtime.fanControl)
         .environment(\.locale, runtime.settings.language.locale)
-        .preferredColorScheme(runtime.settings.appearance.colorScheme)
         .tint(runtime.settings.activeTheme.accentColor)
         .frame(minWidth: 1_020, minHeight: 620)
         .background {
           ZStack {
-            MainWindowConfigurationView()
+            AppWindowConfigurationView(isMainWindow: true)
             MainWindowOpenActionBridge(runtime: runtime)
           }
           .allowsHitTesting(false)
@@ -37,15 +37,15 @@ struct MacScopeNativeApp: App {
     Settings {
       SettingsView()
         .environmentObject(runtime.settings)
+        .environmentObject(runtime.iconController)
         .environmentObject(runtime.monitor.metrics)
         .environmentObject(runtime.updateChecker)
         .environmentObject(runtime.fanControl)
         .environment(\.locale, runtime.settings.language.locale)
-        .preferredColorScheme(runtime.settings.appearance.colorScheme)
         .tint(runtime.settings.activeTheme.accentColor)
         .frame(width: 840, height: 620)
         .background {
-          SidebarHostingWindowConfigurationView()
+          AppWindowConfigurationView()
             .allowsHitTesting(false)
         }
     }
@@ -53,10 +53,14 @@ struct MacScopeNativeApp: App {
     Window("MacScope Help", id: "help") {
       HelpView()
         .environmentObject(runtime.settings)
+        .environmentObject(runtime.iconController)
         .environment(\.locale, runtime.settings.language.locale)
-        .preferredColorScheme(runtime.settings.appearance.colorScheme)
         .tint(runtime.settings.activeTheme.accentColor)
         .frame(minWidth: 680, minHeight: 480)
+        .background {
+          AppWindowConfigurationView()
+            .allowsHitTesting(false)
+        }
     }
     .defaultSize(width: 780, height: 560)
     .windowStyle(.titleBar)

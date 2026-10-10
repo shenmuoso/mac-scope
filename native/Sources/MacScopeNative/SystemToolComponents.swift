@@ -18,47 +18,37 @@ struct SystemToolPageHeader: View {
   let destination: AppDestination
 
   var body: some View {
-    VStack(spacing: 8) {
+    HStack(spacing: 12) {
       ZStack {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
           .fill(destination.iconColor.gradient)
           .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
               .stroke(.white.opacity(0.18), lineWidth: 0.5)
           }
 
         Image(systemName: destination.systemImage)
           .symbolRenderingMode(.monochrome)
-          .font(.system(size: 27, weight: .medium))
+          .font(.system(size: 20, weight: .medium))
           .foregroundStyle(.white)
       }
-      .frame(width: 56, height: 56)
+      .frame(width: 40, height: 40)
       .shadow(color: .black.opacity(0.16), radius: 2, y: 1)
 
-      Text(destination.title)
-        .font(.title2.weight(.semibold))
+      VStack(alignment: .leading, spacing: 4) {
+        Text(destination.title)
+          .font(.title2.weight(.semibold))
 
-      Text(destination.pageDescription)
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.center)
-        .lineLimit(2)
-        .frame(maxWidth: 560)
+        Text(destination.pageDescription)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Spacer(minLength: 0)
     }
-    .frame(maxWidth: .infinity, minHeight: 116)
-    .padding(.horizontal, 28)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 20)
     .padding(.vertical, 16)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-    }
-    .frame(maxWidth: 880)
-    .frame(maxWidth: .infinity)
-    .padding(.horizontal, 24)
-    .padding(.top, 16)
-    .padding(.bottom, 14)
     .accessibilityElement(children: .combine)
   }
 }
@@ -134,6 +124,6 @@ struct SystemToolStatusBar<Actions: View>: View {
     }
     .padding(.horizontal, 14)
     .frame(height: 46)
-    .background(.bar)
+    .appMaterial(.toolbar)
   }
 }

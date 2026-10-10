@@ -1,0 +1,24 @@
+{
+  "fill": { "solid": "extended-srgb:0.955,0.965,0.985,1" },
+  "groups": [
+    {
+      "name": "Activity",
+      "layers": [{ "image-name": "Activity.svg", "name": "Activity signal" }],
+      "shadow": { "kind": "neutral", "opacity": 0.12 },
+      "translucency": { "enabled": true, "value": 0.45 }
+    },
+    {
+      "name": "Core",
+      "layers": [{ "image-name": "Core.svg", "name": "Blue glass core" }],
+      "shadow": { "kind": "neutral", "opacity": 0.18 },
+      "translucency": { "enabled": true, "value": 0.6 }
+    },
+    {
+      "name": "Processor",
+      "layers": [{ "image-name": "Processor.svg", "name": "Glass processor" }],
+      "shadow": { "kind": "neutral", "opacity": 0.25 },
+      "translucency": { "enabled": true, "value": 0.65 }
+    }
+  ],
+  "supported-platforms": { "squares": ["macOS"] }
+}

@@ -55,7 +55,9 @@ if [[ -n "${MACSCOPE_BUILD:-}" ]]; then
     /usr/bin/plutil -replace CFBundleVersion -string "$MACSCOPE_BUILD" "$CONTENTS_DIR/Info.plist"
 fi
 /usr/bin/ditto "$NATIVE_ROOT/Resources/MacScope.icns" "$RESOURCES_DIR/MacScope.icns"
-/usr/bin/ditto "$NATIVE_ROOT/Resources/MacScopeDetailed.icns" "$RESOURCES_DIR/MacScopeDetailed.icns"
+/usr/bin/ditto "$NATIVE_ROOT/Resources/Assets.car" "$RESOURCES_DIR/Assets.car"
+/usr/bin/ditto "$NATIVE_ROOT/Resources/MacScopeDockLight.png" "$RESOURCES_DIR/MacScopeDockLight.png"
+/usr/bin/ditto "$NATIVE_ROOT/Resources/MacScopeDockDark.png" "$RESOURCES_DIR/MacScopeDockDark.png"
 /usr/bin/ditto "$NATIVE_ROOT/Resources/GitHubMark.svg" "$RESOURCES_DIR/GitHubMark.svg"
 for localization in "$NATIVE_ROOT"/Resources/*.lproj; do
     [[ -d "$localization" ]] || continue

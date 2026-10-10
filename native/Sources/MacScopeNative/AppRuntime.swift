@@ -10,7 +10,9 @@ final class AppRuntime: ObservableObject {
   let navigation: AppNavigation
   let updateChecker: UpdateChecker
   let fanControl: FanControlManager
+  let iconController: AppIconController
 
+  private let appearanceController: AppAppearanceController
   private var menuBarController: MenuBarController?
   private var openMainWindowHandler: (() -> Void)?
   private var hasStarted = false
@@ -20,6 +22,8 @@ final class AppRuntime: ObservableObject {
   init() {
     monitor = SystemMonitor()
     settings = AppSettings()
+    appearanceController = AppAppearanceController(settings: settings)
+    iconController = AppIconController(settings: settings)
     maintenance = MaintenanceStore()
     startupItems = StartupItemsStore()
     navigation = AppNavigation()
@@ -28,7 +32,6 @@ final class AppRuntime: ObservableObject {
 
     let sceneSettingsChanges: [AnyPublisher<Void, Never>] = [
       settings.$language.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
-      settings.$appearance.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
       settings.$themeID.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
     ]
     Publishers.MergeMany(sceneSettingsChanges)
@@ -53,6 +56,16 @@ final class AppRuntime: ObservableObject {
       .sink { [weak maintenance] language in
         Task { @MainActor in
           maintenance?.updateLanguage(language)
+        }
+      }
+      .store(in: &cancellables)
+
+    settings.$dockIconVisible
+      .removeDuplicates()
+      .dropFirst()
+      .sink { [weak self] isVisible in
+        Task { @MainActor in
+          self?.applyDockIconVisibility(isVisible)
         }
       }
       .store(in: &cancellables)
@@ -87,7 +100,7 @@ final class AppRuntime: ObservableObject {
     monitor.updateRefreshInterval(settings.refreshInterval)
     monitor.start()
     maintenance.updateLanguage(settings.language)
-    AppIconController.apply(settings.appIconStyle)
+    applyDockIconVisibility(settings.dockIconVisible)
     updateChecker.checkOnLaunch()
 
     DispatchQueue.main.async { [weak self] in
@@ -98,6 +111,15 @@ final class AppRuntime: ObservableObject {
   func setOpenMainWindowHandler(_ handler: @escaping () -> Void) {
     openMainWindowHandler = handler
     menuBarController?.setOpenMainWindowHandler(handler)
+  }
+
+  private func applyDockIconVisibility(_ isVisible: Bool) {
+    let keyWindow = NSApp.keyWindow
+    NSApp.setActivationPolicy(isVisible ? .regular : .accessory)
+    iconController.refresh()
+    if let keyWindow, keyWindow.isVisible {
+      keyWindow.makeKeyAndOrderFront(nil)
+    }
   }
 
   private func bindMainWindowVisibility() {
