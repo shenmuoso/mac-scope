@@ -9,6 +9,7 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable, Sendable {
 
 enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
   case cpu
+  case gpu
   case memory
   case disk
   case network
@@ -22,6 +23,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
   var title: String {
     switch self {
     case .cpu: "CPU Usage"
+    case .gpu: "GPU Usage"
     case .memory: "Memory Usage"
     case .disk: "Disk Activity"
     case .network: "Network Activity"
@@ -35,6 +37,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
   var systemImage: String {
     switch self {
     case .cpu: "cpu"
+    case .gpu: "square.3.layers.3d"
     case .memory: "memorychip"
     case .disk: "internaldrive"
     case .network: "network"
@@ -48,6 +51,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable, Sendable {
 
 enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
   case cpu
+  case gpu
   case memory
   case disk
   case network
@@ -62,6 +66,7 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
   var title: String {
     switch self {
     case .cpu: "CPU"
+    case .gpu: "GPU"
     case .memory: "Memory"
     case .disk: "Disk"
     case .network: "Network"
@@ -76,6 +81,7 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
   var systemImage: String {
     switch self {
     case .cpu: "cpu"
+    case .gpu: "square.3.layers.3d"
     case .memory: "memorychip"
     case .disk: "internaldrive"
     case .network: "network"

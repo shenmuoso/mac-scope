@@ -695,3 +695,15 @@
 "MacScope could not check Open at Login entries for this application." = "MacScope 无法检查与这个应用关联的“登录时打开”项目。";
 "No Matching Startup Issues" = "没有匹配的启动项问题";
 "No startup issues match the current search." = "没有启动项问题符合当前搜索内容。";
+
+"GPU" = "GPU";
+"GPU Usage" = "GPU 占用率";
+"GPU Activity" = "GPU 活动";
+"GPU Telemetry Unavailable" = "GPU 数据暂不可用";
+"Apple Silicon GPU" = "Apple 芯片集成 GPU";
+"Renderer" = "渲染占用";
+"Tiler" = "分块占用";
+"GPU utilization is not exposed by this Mac right now." = "当前系统未提供有效的 GPU 占用数据。";
+"Collecting GPU Activity" = "正在采集 GPU 数据";
+"Live CPU, GPU, memory, disk, and network activity." = "实时查看 CPU、GPU、内存、磁盘和网络活动。";
+"Real-time CPU, GPU, power, temperature, and cooling activity." = "实时查看 CPU、GPU、功耗、温度和散热状态。";

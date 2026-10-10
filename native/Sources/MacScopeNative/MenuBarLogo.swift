@@ -106,14 +106,19 @@ struct MenuBarStatusPresentation {
   let selectedMetrics: [MenuBarMetric]
   let temperatureUnit: TemperatureUnit
 
+  var metrics: [MenuBarMetric] {
+    guard displayMode == .compact else { return [] }
+    return selectedMetrics.filter { $0 != .gpu || GPUMetricsReader.isSupported }
+  }
+
   var compactText: String? {
-    guard displayMode == .compact, !selectedMetrics.isEmpty else { return nil }
-    return selectedMetrics.map(value(for:)).joined(separator: " · ")
+    guard !metrics.isEmpty else { return nil }
+    return metrics.map(value(for:)).joined(separator: " · ")
   }
 
   var accessibilityLabel: String {
     guard compactText != nil else { return "MacScope" }
-    let values = selectedMetrics.map { metric in
+    let values = metrics.map { metric in
       "\(metric.title), \(value(for: metric))"
     }.joined(separator: ", ")
     return "MacScope, \(values)"
@@ -123,6 +128,8 @@ struct MenuBarStatusPresentation {
     switch metric {
     case .cpu:
       return "CPU \(DisplayFormat.compactPercent(snapshot.cpu.total))"
+    case .gpu:
+      return "GPU \(snapshot.gpu.totalPercent.map(DisplayFormat.compactPercent) ?? "--")"
     case .memory:
       return "MEM \(DisplayFormat.compactPercent(snapshot.memory.fraction * 100))"
     case .disk:

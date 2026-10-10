@@ -46,6 +46,7 @@ struct ThemePalette: Hashable, Identifiable, Sendable {
     id == Self.system.id ? Color(nsColor: .controlAccentColor) : Color(hex: accentHex)
   }
   var cpuColor: Color { Color(hex: cpuHex) }
+  var gpuColor: Color { Color(nsColor: .systemTeal) }
   var memoryColor: Color { Color(hex: memoryHex) }
   var diskColor: Color { Color(hex: diskHex) }
   var networkColor: Color { Color(hex: networkHex) }

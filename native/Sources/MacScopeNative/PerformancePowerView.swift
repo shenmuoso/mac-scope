@@ -16,6 +16,7 @@ struct PerformancePowerView: View {
         VStack(spacing: 16) {
           statusMetrics
           cpuPanel
+          if GPUMetricsReader.isSupported { gpuPanel }
           powerPanel
           thermalPanel
           coolingPanel
@@ -65,7 +66,10 @@ struct PerformancePowerView: View {
 
   private var statusMetrics: some View {
     LazyVGrid(
-      columns: [GridItem(.adaptive(minimum: 175, maximum: 260), spacing: 12)],
+      columns: Array(
+        repeating: GridItem(.flexible(minimum: 130), spacing: 12),
+        count: GPUMetricsReader.isSupported ? 5 : 4
+      ),
       spacing: 12
     ) {
       PerformanceStatusMetric(
@@ -89,6 +93,21 @@ struct PerformancePowerView: View {
         detail: systemPowerDetail,
         indicatorColor: .orange
       )
+
+      if GPUMetricsReader.isSupported {
+        PerformanceStatusMetric(
+          title: "GPU Usage",
+          systemImage: "square.3.layers.3d",
+          value: metrics.snapshot.gpu.totalPercent.map(DisplayFormat.percent) ?? "--",
+          detail: localized(
+            metrics.snapshot.gpu.totalPercent == nil
+              ? "GPU Telemetry Unavailable" : "Apple Silicon GPU"
+          ),
+          indicatorColor: metrics.snapshot.gpu.totalPercent.map {
+            MetricColorScale.utilization(fraction: $0 / 100)
+          } ?? .secondary
+        )
+      }
 
       PerformanceStatusMetric(
         title: "SoC Temperature",
@@ -195,6 +214,71 @@ struct PerformancePowerView: View {
         .transaction { $0.animation = nil }
       } else {
         collectingView("Collecting Power Activity")
+      }
+    }
+  }
+
+  private var gpuPanel: some View {
+    PerformancePanel(title: "GPU Activity", subtitle: "Last 60 Seconds") {
+      if metrics.snapshot.gpu.state != .available {
+        coolingCapabilityView(
+          systemImage: "square.3.layers.3d",
+          title: "GPU Telemetry Unavailable",
+          message: "GPU utilization is not exposed by this Mac right now."
+        )
+      } else {
+        HStack(spacing: 24) {
+          if let renderer = metrics.snapshot.gpu.rendererPercent {
+            ChartLegendValue(
+              title: "Renderer",
+              value: DisplayFormat.percent(renderer),
+              color: settings.activeTheme.gpuColor
+            )
+          }
+          if let tiler = metrics.snapshot.gpu.tilerPercent {
+            ChartLegendValue(
+              title: "Tiler",
+              value: DisplayFormat.percent(tiler),
+              color: .secondary
+            )
+          }
+          Spacer(minLength: 0)
+        }
+
+        if metrics.history.filter({ $0.gpuPercent != nil }).count > 1 {
+          Chart {
+            ForEach(metrics.history) { point in
+              if let gpuPercent = point.gpuPercent {
+                AreaMark(
+                  x: .value("Time", point.timestamp),
+                  y: .value("GPU", gpuPercent)
+                )
+                .foregroundStyle(
+                  .linearGradient(
+                    colors: [settings.activeTheme.gpuColor.opacity(0.22), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                  )
+                )
+                LineMark(
+                  x: .value("Time", point.timestamp),
+                  y: .value("GPU", gpuPercent)
+                )
+                .foregroundStyle(settings.activeTheme.gpuColor)
+                .interpolationMethod(.catmullRom)
+                .lineStyle(chartLineStyle)
+              }
+            }
+          }
+          .chartXAxis(.hidden)
+          .chartYAxis { AxisMarks(position: .leading) }
+          .chartXScale(domain: historyDomain)
+          .chartYScale(domain: 0...100)
+          .frame(height: 180)
+          .transaction { $0.animation = nil }
+        } else {
+          collectingView("Collecting GPU Activity")
+        }
       }
     }
   }
@@ -649,13 +733,16 @@ private struct PerformanceStatusMetric: View {
         Text(title)
           .font(.caption)
           .foregroundStyle(.secondary)
+          .lineLimit(1)
         Text(value)
           .font(.title3.weight(.semibold))
           .monospacedDigit()
+          .lineLimit(1)
+          .minimumScaleFactor(0.8)
         Text(detail)
           .font(.caption)
           .foregroundStyle(.secondary)
-          .lineLimit(1)
+          .lineLimit(2)
           .minimumScaleFactor(0.8)
       }
     }

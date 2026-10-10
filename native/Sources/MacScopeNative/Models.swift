@@ -28,6 +28,21 @@ struct CPUUsage: Sendable {
   var temperature: TemperatureUsage
 }
 
+enum GPUSupportState: Sendable {
+  case available
+  case unavailable
+  case unsupported
+}
+
+struct GPUUsage: Sendable {
+  var state: GPUSupportState
+  var totalPercent: Double? = nil
+  var rendererPercent: Double? = nil
+  var tilerPercent: Double? = nil
+
+  static let unavailable = GPUUsage(state: .unavailable)
+}
+
 struct PowerUsage: Sendable, Equatable {
   var systemWatts: Double?
   var chargingWatts: Double?
@@ -450,6 +465,7 @@ struct SystemHistoryPoint: Identifiable, Sendable {
   let systemPowerWatts: Double?
   let chargingPowerWatts: Double?
   let fanReadings: [FanHistoryReading]
+  var gpuPercent: Double? = nil
 
   var id: Date { timestamp }
 }
@@ -468,6 +484,7 @@ struct SystemSnapshot: Sendable {
   var power: PowerUsage
   var cooling: CoolingUsage
   var processes: [ProcessRow]
+  var gpu: GPUUsage = .unavailable
 
   static let empty = SystemSnapshot(
     timestamp: .now,

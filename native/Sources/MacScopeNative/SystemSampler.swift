@@ -45,6 +45,8 @@ actor SystemSampler {
   private var temperatureUpdatedAt = -TimeInterval.infinity
   private var power = PowerUsage.unavailable
   private var powerUpdatedAt = -TimeInterval.infinity
+  private var gpu = GPUUsage.unavailable
+  private var gpuUpdatedAt = -TimeInterval.infinity
   private let smcReader = SMCReader()
   private var cooling = CoolingUsage.unavailable
   private var coolingUpdatedAt = -TimeInterval.infinity
@@ -59,6 +61,10 @@ actor SystemSampler {
     if now - powerUpdatedAt >= 1 {
       power = PowerMetricsReader.read()
       powerUpdatedAt = now
+    }
+    if now - gpuUpdatedAt >= (gpu.state == .available ? 2 : 30) {
+      gpu = GPUMetricsReader.read()
+      gpuUpdatedAt = now
     }
     let coolingInterval: TimeInterval = cooling.state == .available ? 2 : 30
     if now - coolingUpdatedAt >= coolingInterval {
@@ -114,7 +120,8 @@ actor SystemSampler {
       network: network,
       power: power,
       cooling: cooling,
-      processes: []
+      processes: [],
+      gpu: gpu
     )
   }
 

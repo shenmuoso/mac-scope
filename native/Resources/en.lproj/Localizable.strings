@@ -695,3 +695,15 @@
 "MacScope could not check Open at Login entries for this application." = "MacScope could not check Open at Login entries for this application.";
 "No Matching Startup Issues" = "No Matching Startup Issues";
 "No startup issues match the current search." = "No startup issues match the current search.";
+
+"GPU" = "GPU";
+"GPU Usage" = "GPU Usage";
+"GPU Activity" = "GPU Activity";
+"GPU Telemetry Unavailable" = "GPU Telemetry Unavailable";
+"Apple Silicon GPU" = "Apple Silicon GPU";
+"Renderer" = "Renderer";
+"Tiler" = "Tiler";
+"GPU utilization is not exposed by this Mac right now." = "GPU utilization is not exposed by this Mac right now.";
+"Collecting GPU Activity" = "Collecting GPU Activity";
+"Live CPU, GPU, memory, disk, and network activity." = "Live CPU, GPU, memory, disk, and network activity.";
+"Real-time CPU, GPU, power, temperature, and cooling activity." = "Real-time CPU, GPU, power, temperature, and cooling activity.";

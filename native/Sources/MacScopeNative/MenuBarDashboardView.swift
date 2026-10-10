@@ -245,6 +245,16 @@ private struct MenuBarMetricRow: View {
           MetricColorScale.utilization(fraction: snapshot.memory.fraction)
         )
       )
+    case .gpu:
+      let utilization = snapshot.gpu.totalPercent
+      return MetricPresentation(
+        value: utilization.map(DisplayFormat.percent) ?? "--",
+        detail: localized(utilization == nil ? "GPU Telemetry Unavailable" : "Apple Silicon GPU"),
+        accentColor: accent(theme.gpuColor),
+        valueColor: .primary,
+        progress: utilization.map { $0 / 100 },
+        progressColor: progress(MetricColorScale.utilization(fraction: (utilization ?? 0) / 100))
+      )
     case .disk:
       return MetricPresentation(
         value: DisplayFormat.percent(snapshot.disk.fraction * 100),
@@ -404,6 +414,8 @@ private struct MetricSparkline: View {
       switch module {
       case .cpu:
         value = point.cpuPercent
+      case .gpu:
+        value = point.gpuPercent
       case .memory:
         value = point.memoryPercent
       case .disk:
@@ -427,7 +439,7 @@ private struct MetricSparkline: View {
 
   private var yDomain: ClosedRange<Double> {
     switch module {
-    case .cpu, .memory:
+    case .cpu, .gpu, .memory:
       return 0...100
     case .disk, .network:
       return 0...max(1, (points.map(\.value).max() ?? 0) * 1.12)

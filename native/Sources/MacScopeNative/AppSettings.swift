@@ -182,6 +182,7 @@ final class AppSettings: ObservableObject {
     } else {
       menuBarMetrics = Array(
         Self.decode(MenuBarMetric.self, values: defaults.stringArray(forKey: Key.menuBarMetrics))
+          .filter { $0 != .gpu || GPUMetricsReader.isSupported }
           .prefix(3)
       )
     }
@@ -191,7 +192,7 @@ final class AppSettings: ObservableObject {
       menuBarModules = Self.decode(
         MenuBarModule.self,
         values: defaults.stringArray(forKey: Key.menuBarModules)
-      )
+      ).filter { $0 != .gpu || GPUMetricsReader.isSupported }
     }
     menuBarProcessSort =
       MenuBarProcessSort(rawValue: defaults.string(forKey: Key.menuBarProcessSort) ?? "") ?? .cpu
@@ -279,15 +280,18 @@ final class AppSettings: ObservableObject {
   }
 
   var orderedMenuBarMetrics: [MenuBarMetric] {
-    menuBarMetrics + MenuBarMetric.allCases.filter { !menuBarMetrics.contains($0) }
+    (menuBarMetrics + MenuBarMetric.allCases.filter { !menuBarMetrics.contains($0) })
+      .filter { $0 != .gpu || GPUMetricsReader.isSupported }
   }
 
   var orderedMenuBarModules: [MenuBarModule] {
-    menuBarModules + MenuBarModule.allCases.filter { !menuBarModules.contains($0) }
+    (menuBarModules + MenuBarModule.allCases.filter { !menuBarModules.contains($0) })
+      .filter { $0 != .gpu || GPUMetricsReader.isSupported }
   }
 
   func setMenuBarMetric(_ metric: MenuBarMetric, isEnabled: Bool) {
     if isEnabled {
+      guard metric != .gpu || GPUMetricsReader.isSupported else { return }
       guard !menuBarMetrics.contains(metric), menuBarMetrics.count < 3 else { return }
       menuBarMetrics.append(metric)
     } else {
@@ -301,6 +305,7 @@ final class AppSettings: ObservableObject {
 
   func setMenuBarModule(_ module: MenuBarModule, isEnabled: Bool) {
     if isEnabled {
+      guard module != .gpu || GPUMetricsReader.isSupported else { return }
       guard !menuBarModules.contains(module) else { return }
       menuBarModules.append(module)
     } else {
