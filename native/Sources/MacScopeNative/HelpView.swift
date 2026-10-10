@@ -48,14 +48,17 @@ struct HelpView: View {
           .tag(topic)
       }
       .listStyle(.sidebar)
-      .compactNativeScrollers()
+      .scrollContentBackground(.hidden)
+      .compactNativeScrollers(clearsBackground: true)
+      .appSidebarBackground()
       .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 220)
     } detail: {
       topicContent(selection ?? .overview)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .appDetailBackground()
     }
     .navigationSplitViewStyle(.balanced)
+    .appSplitWindowStyle()
     .navigationTitle(AppLocalization.string("MacScope Help", language: settings.language))
   }
 
@@ -76,12 +79,7 @@ struct HelpView: View {
   private var projectPage: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
-        Image(
-          nsImage: AppIconController.image(for: settings.appIconStyle)
-            ?? NSApp.applicationIconImage
-        )
-          .resizable()
-          .aspectRatio(contentMode: .fit)
+        AppIconImage()
           .frame(width: 72, height: 72)
         Text("MacScope")
           .font(.title2.weight(.semibold))

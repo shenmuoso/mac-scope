@@ -2,13 +2,30 @@ import AppKit
 import Charts
 import SwiftUI
 
+private struct MenuBarForegroundKey: EnvironmentKey {
+  static let defaultValue = Color.primary
+}
+
+private extension EnvironmentValues {
+  var menuBarForeground: Color {
+    get { self[MenuBarForegroundKey.self] }
+    set { self[MenuBarForegroundKey.self] = newValue }
+  }
+}
+
 struct MenuBarDashboardView: View {
   @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var metrics: SystemMetricsStore
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
+  @Environment(\.colorScheme) private var colorScheme
 
+  var maximumHeight: CGFloat = 650
   let openMainWindow: () -> Void
+  let openSettings: () -> Void
+
+  // Semantic label colors become vibrant inside native glass; keep telemetry text fully legible.
+  private var foreground: Color { colorScheme == .dark ? .white : .black }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -31,24 +48,27 @@ struct MenuBarDashboardView: View {
       Divider()
       footer
     }
-    .frame(width: 390, height: panelHeight)
-    .background {
-      if #available(macOS 26.0, *) {
-        Color.clear
-      } else {
-        MenuBarPanelMaterialView()
-          .allowsHitTesting(false)
-      }
-    }
+    .foregroundStyle(foreground)
+    .environment(\.menuBarForeground, foreground)
+    .frame(width: 390, height: Self.contentSize(
+      modules: settings.menuBarModules,
+      processLimit: settings.menuBarProcessLimit,
+      maximumHeight: maximumHeight
+    ).height)
   }
 
-  private var panelHeight: CGFloat {
-    let metricCount = settings.menuBarModules.filter { $0 != .processes }.count
+  static func contentSize(
+    modules: [MenuBarModule],
+    processLimit: Int,
+    maximumHeight: CGFloat
+  ) -> NSSize {
+    let metricCount = modules.filter { $0 != .processes }.count
     let processHeight =
-      settings.menuBarModules.contains(.processes)
-      ? 48 + CGFloat(settings.menuBarProcessLimit) * 32
+      modules.contains(.processes)
+      ? 48 + CGFloat(processLimit) * 32
       : 0
-    return min(650, max(250, 112 + CGFloat(metricCount) * 82 + processHeight))
+    let height = min(maximumHeight, min(650, max(250, 112 + CGFloat(metricCount) * 82 + processHeight)))
+    return NSSize(width: 390, height: height)
   }
 
   private var header: some View {
@@ -61,12 +81,12 @@ struct MenuBarDashboardView: View {
           .font(.headline)
         if monitor.isPaused {
           Text("Monitoring Paused")
-            .foregroundStyle(.secondary)
+            .foregroundStyle(foreground.opacity(0.9))
         } else {
           Text(
             "Updated \(metrics.snapshot.timestamp.formatted(date: .omitted, time: .standard))"
           )
-          .foregroundStyle(.secondary)
+          .foregroundStyle(foreground.opacity(0.9))
         }
       }
       .font(.caption)
@@ -78,7 +98,7 @@ struct MenuBarDashboardView: View {
           .frame(width: 20, height: 20)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(.primary)
+      .foregroundStyle(foreground)
       .help(monitor.isPaused ? "Resume Monitoring" : "Pause Monitoring")
 
       Button(action: { monitor.refreshNow() }) {
@@ -86,7 +106,7 @@ struct MenuBarDashboardView: View {
           .frame(width: 20, height: 20)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(.primary)
+      .foregroundStyle(foreground)
       .help("Refresh Now")
       .disabled(monitor.isRefreshing)
     }
@@ -109,16 +129,16 @@ struct MenuBarDashboardView: View {
         Label("Open MacScope", systemImage: "macwindow")
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(.primary)
+      .foregroundStyle(foreground)
 
       Spacer()
 
-      Button(action: AppWindowActions.openSettings) {
+      Button(action: openSettings) {
         Image(systemName: "gearshape")
           .frame(width: 20, height: 20)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(.primary)
+      .foregroundStyle(foreground)
       .help("Settings")
 
       Button {
@@ -128,7 +148,7 @@ struct MenuBarDashboardView: View {
           .frame(width: 20, height: 20)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(.primary)
+      .foregroundStyle(foreground)
       .help("Quit MacScope")
     }
     .padding(.horizontal, 14)
@@ -136,7 +156,7 @@ struct MenuBarDashboardView: View {
   }
 
   private var dashboardLogoColor: Color {
-    settings.menuBarColorfulMode ? settings.activeTheme.accentColor : .primary
+    settings.menuBarColorfulMode ? settings.activeTheme.accentColor : foreground
   }
 
   private func openProcess(_ process: ProcessRow) {
@@ -148,6 +168,7 @@ struct MenuBarDashboardView: View {
 private struct MenuBarMetricRow: View {
   @EnvironmentObject private var metrics: SystemMetricsStore
   @EnvironmentObject private var settings: AppSettings
+  @Environment(\.menuBarForeground) private var foreground
 
   let module: MenuBarModule
 
@@ -172,7 +193,7 @@ private struct MenuBarMetricRow: View {
 
         Text(presentation.detail)
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(foreground.opacity(0.9))
           .monospacedDigit()
           .lineLimit(1)
 
@@ -199,15 +220,15 @@ private struct MenuBarMetricRow: View {
   private var presentation: MetricPresentation {
     let snapshot = metrics.snapshot
     let theme = settings.activeTheme
-    let neutralAccent = Color.primary.opacity(0.68)
-    let neutralProgress = Color.primary.opacity(0.5)
+    let neutralAccent = foreground.opacity(0.85)
+    let neutralProgress = foreground.opacity(0.7)
 
     func accent(_ colorfulColor: Color) -> Color {
       settings.menuBarColorfulMode ? colorfulColor : neutralAccent
     }
 
     func emphasizedValue(_ colorfulColor: Color) -> Color {
-      settings.menuBarColorfulMode ? colorfulColor : .primary
+      settings.menuBarColorfulMode ? colorfulColor : foreground
     }
 
     func progress(_ colorfulColor: Color) -> Color {
@@ -224,7 +245,7 @@ private struct MenuBarMetricRow: View {
           DisplayFormat.percent(snapshot.cpu.system)
         ),
         accentColor: accent(theme.cpuColor),
-        valueColor: .primary,
+        valueColor: foreground,
         progress: snapshot.cpu.total / 100,
         progressColor: progress(
           MetricColorScale.utilization(fraction: snapshot.cpu.total / 100)
@@ -239,11 +260,21 @@ private struct MenuBarMetricRow: View {
           DisplayFormat.bytes(snapshot.memory.total)
         ),
         accentColor: accent(theme.memoryColor),
-        valueColor: .primary,
+        valueColor: foreground,
         progress: snapshot.memory.fraction,
         progressColor: progress(
           MetricColorScale.utilization(fraction: snapshot.memory.fraction)
         )
+      )
+    case .gpu:
+      let utilization = snapshot.gpu.totalPercent
+      return MetricPresentation(
+        value: utilization.map(DisplayFormat.percent) ?? "--",
+        detail: localized(utilization == nil ? "GPU Telemetry Unavailable" : "Apple Silicon GPU"),
+        accentColor: accent(theme.gpuColor),
+        valueColor: foreground,
+        progress: utilization.map { $0 / 100 },
+        progressColor: progress(MetricColorScale.utilization(fraction: (utilization ?? 0) / 100))
       )
     case .disk:
       return MetricPresentation(
@@ -251,7 +282,7 @@ private struct MenuBarMetricRow: View {
         detail:
           "↓ \(DisplayFormat.rate(snapshot.disk.readRate))  ↑ \(DisplayFormat.rate(snapshot.disk.writeRate))",
         accentColor: accent(theme.diskColor),
-        valueColor: .primary,
+        valueColor: foreground,
         progress: snapshot.disk.fraction,
         progressColor: progress(
           MetricColorScale.utilization(fraction: snapshot.disk.fraction)
@@ -282,7 +313,7 @@ private struct MenuBarMetricRow: View {
         value: DisplayFormat.power(snapshot.power.systemWatts) ?? "--",
         detail: systemPowerDetail(snapshot.power),
         accentColor: accent(.orange),
-        valueColor: .primary,
+        valueColor: foreground,
         progress: nil,
         progressColor: .clear
       )
@@ -291,7 +322,7 @@ private struct MenuBarMetricRow: View {
         value: DisplayFormat.power(snapshot.power.chargingWatts) ?? "--",
         detail: chargingPowerDetail(snapshot.power),
         accentColor: accent(.green),
-        valueColor: .primary,
+        valueColor: foreground,
         progress: nil,
         progressColor: .clear
       )
@@ -300,7 +331,7 @@ private struct MenuBarMetricRow: View {
         value: DisplayFormat.fanSpeed(snapshot.cooling.fans.map(\.currentRPM).max()) ?? "--",
         detail: fanDetail(snapshot.cooling),
         accentColor: accent(.blue),
-        valueColor: .primary,
+        valueColor: foreground,
         progress: nil,
         progressColor: .clear
       )
@@ -404,6 +435,8 @@ private struct MetricSparkline: View {
       switch module {
       case .cpu:
         value = point.cpuPercent
+      case .gpu:
+        value = point.gpuPercent
       case .memory:
         value = point.memoryPercent
       case .disk:
@@ -427,7 +460,7 @@ private struct MetricSparkline: View {
 
   private var yDomain: ClosedRange<Double> {
     switch module {
-    case .cpu, .memory:
+    case .cpu, .gpu, .memory:
       return 0...100
     case .disk, .network:
       return 0...max(1, (points.map(\.value).max() ?? 0) * 1.12)
@@ -450,6 +483,7 @@ private struct MetricSparkline: View {
 private struct MenuBarProcessesView: View {
   @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var settings: AppSettings
+  @Environment(\.menuBarForeground) private var foreground
 
   let onSelect: (ProcessRow) -> Void
 
@@ -476,7 +510,7 @@ private struct MenuBarProcessesView: View {
           ProgressView()
             .controlSize(.small)
           Text("Collecting process activity")
-            .foregroundStyle(.secondary)
+            .foregroundStyle(foreground.opacity(0.9))
         }
         .font(.caption)
         .frame(maxWidth: .infinity)
@@ -526,6 +560,7 @@ private struct MenuBarProcessesView: View {
 }
 
 private struct MenuBarProcessRow: View {
+  @Environment(\.menuBarForeground) private var foreground
   let process: ProcessRow
   let value: String
   let action: () -> Void
@@ -537,20 +572,20 @@ private struct MenuBarProcessRow: View {
       HStack(spacing: 8) {
         Image(systemName: "app.fill")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(foreground.opacity(0.85))
           .frame(width: 18)
         Text(process.name)
           .lineLimit(1)
         Spacer(minLength: 8)
         Text(value)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(foreground.opacity(0.9))
           .monospacedDigit()
       }
       .font(.caption)
       .padding(.horizontal, 14)
       .frame(height: 32)
       .contentShape(Rectangle())
-      .background(isHovered ? Color.primary.opacity(0.06) : Color.clear)
+      .background(isHovered ? foreground.opacity(0.06) : Color.clear)
     }
     .buttonStyle(.plain)
     .onHover { isHovered = $0 }

@@ -26,7 +26,8 @@ final class SystemMetricsStore: ObservableObject {
         chargingPowerWatts: metrics.power.chargingWatts,
         fanReadings: metrics.cooling.fans.map {
           FanHistoryReading(id: $0.id, rpm: $0.currentRPM)
-        }
+        },
+        gpuPercent: metrics.gpu.totalPercent
       )
     )
     snapshot = metrics

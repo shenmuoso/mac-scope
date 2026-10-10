@@ -107,6 +107,60 @@ struct UpdateCheckerTests {
     #expect(update.version == "0.4.11")
   }
 
+  @Test("A cold launch ignores a fresh up-to-date cache")
+  @MainActor
+  func coldLaunchRefreshesFreshCache() async throws {
+    let suiteName = "UpdateCheckerTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let releasePage = try #require(URL(string: "https://github.com/shenmuoso/mac-scope/releases/5"))
+    defaults.set("0.4.10", forKey: "native.update.latestVersion")
+    defaults.set(releasePage.absoluteString, forKey: "native.update.releaseURL")
+    defaults.set(releasePage.absoluteString, forKey: "native.update.downloadURL")
+    defaults.set(Date(), forKey: "native.update.lastSuccessfulCheck")
+    let latestRelease = release(htmlURL: releasePage)
+    let checker = UpdateChecker(
+      defaults: defaults,
+      currentVersion: "0.4.10",
+      releaseFetcher: { latestRelease }
+    )
+
+    checker.checkOnLaunch()
+    await waitForCheck(checker)
+
+    #expect(checker.availableUpdate?.version == "0.4.11")
+    #expect(!checker.lastCheckFailed)
+  }
+
+  @Test("A failed refresh preserves a cached available update")
+  @MainActor
+  func failedRefreshPreservesCachedUpdate() async throws {
+    let suiteName = "UpdateCheckerTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("0.4.11", forKey: "native.update.latestVersion")
+    defaults.set(
+      "https://github.com/shenmuoso/mac-scope/releases/6",
+      forKey: "native.update.releaseURL"
+    )
+    defaults.set(
+      "https://github.com/shenmuoso/mac-scope/releases/download/6/MacScope-arm64.dmg",
+      forKey: "native.update.downloadURL"
+    )
+    defaults.set(Date(), forKey: "native.update.lastSuccessfulCheck")
+    let checker = UpdateChecker(
+      defaults: defaults,
+      currentVersion: "0.4.10",
+      releaseFetcher: { throw TestFailure.offline }
+    )
+
+    checker.checkNow()
+    await waitForCheck(checker)
+
+    #expect(checker.availableUpdate?.version == "0.4.11")
+    #expect(checker.lastCheckFailed)
+  }
+
   private func release(
     htmlURL: URL,
     draft: Bool = false,
@@ -120,5 +174,16 @@ struct UpdateCheckerTests {
       prerelease: prerelease,
       assets: []
     )
+  }
+
+  @MainActor
+  private func waitForCheck(_ checker: UpdateChecker) async {
+    while checker.isChecking {
+      await Task.yield()
+    }
+  }
+
+  private enum TestFailure: Error {
+    case offline
   }
 }

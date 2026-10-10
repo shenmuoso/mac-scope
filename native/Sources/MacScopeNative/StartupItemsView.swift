@@ -207,7 +207,7 @@ struct StartupItemsView: View {
     }
     .padding(.horizontal, 14)
     .frame(height: 50)
-    .background(.bar)
+    .appMaterial(.toolbar)
   }
 
   @ViewBuilder

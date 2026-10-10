@@ -47,26 +47,16 @@ struct MacScopeRootView: View {
         Divider()
         sidebarFooter
       }
-      .background {
-        SidebarMaterialView(
-          isEnabled: settings.sidebarTransparencyEnabled,
-          transparency: settings.sidebarTransparency
-        )
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-      }
+      .appSidebarBackground()
       .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
     } detail: {
       detailContent
         .navigationTitle("")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-          Color(nsColor: .windowBackgroundColor)
-            .ignoresSafeArea()
-        }
-        .clipped()
+        .appDetailBackground()
     }
     .navigationSplitViewStyle(.balanced)
+    .appSplitWindowStyle()
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         if #available(macOS 14.0, *) {

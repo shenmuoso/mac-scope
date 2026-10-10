@@ -3,15 +3,20 @@ import Combine
 import SwiftUI
 
 @MainActor
-final class MenuBarController: NSObject, NSPopoverDelegate {
+final class MenuBarController: NSObject, NSWindowDelegate {
   private let monitor: SystemMonitor
   private let settings: AppSettings
   private let navigation: AppNavigation
-  private let popover = NSPopover()
+  private let panel = MenuBarDashboardPanel()
   private let hostingController = NSHostingController(rootView: AnyView(EmptyView()))
 
   private var statusItem: NSStatusItem?
-  private var statusShowsCompactText: Bool?
+  private var statusContentView: MenuBarNativeStatusView?
+  private var localEventMonitor: Any?
+  private var globalEventMonitor: Any?
+  private var hideTask: Task<Void, Never>?
+  private var pointerHasEntered = false
+  private var menuTrackingDepth = 0
   private var openMainWindowHandler: (() -> Void)?
   private var cancellables: Set<AnyCancellable> = []
 
@@ -26,10 +31,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     super.init()
 
     hostingController.sizingOptions = [.intrinsicContentSize, .preferredContentSize]
-    popover.behavior = .transient
-    popover.animates = true
-    popover.delegate = self
-    popover.contentViewController = hostingController
+    hostingController.view.wantsLayer = true
+    hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
+    panel.delegate = self
+    panel.setHostedView(hostingController.view)
+    panel.onPointerChange = { [weak self] isInside in
+      self?.pointerChanged(isInside: isInside)
+    }
 
     bind()
     updateStatusItemAvailability(isEnabled: settings.menuBarEnabled)
@@ -39,14 +47,23 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     openMainWindowHandler = handler
   }
 
-  func popoverDidClose(_ notification: Notification) {
+  func windowWillClose(_ notification: Notification) {
+    guard notification.object as? NSWindow === panel else { return }
+    hideTask?.cancel()
+    hideTask = nil
+    removeEventMonitors()
     statusItem?.button?.highlight(false)
+    statusContentView?.needsDisplay = true
     hostingController.rootView = AnyView(EmptyView())
-    updatePopoverSampling()
+    monitor.setMetricsSampling(false, for: .menuBar)
+    monitor.setProcessSampling(false, for: .menuBar)
   }
 
-  func popoverDidShow(_ notification: Notification) {
-    updatePopoverSampling()
+  func windowDidResignKey(_ notification: Notification) {
+    guard notification.object as? NSWindow === panel, panel.isPresented,
+      panel.attachedSheet == nil, menuTrackingDepth == 0
+    else { return }
+    dismissPanel()
   }
 
   private func bind() {
@@ -58,6 +75,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
       .store(in: &cancellables)
 
     metricsChanges
+      .receive(on: DispatchQueue.main)
       .sink { [weak self] in
         self?.updateStatusItemContent()
       }
@@ -65,7 +83,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     let dashboardChanges: [AnyPublisher<Void, Never>] = [
       settings.$language.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
-      settings.$appearance.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
+      settings.$liquidGlassStyle.removeDuplicates().dropFirst().map { _ in () }
+        .eraseToAnyPublisher(),
       settings.$themeID.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
       settings.$menuBarModules.removeDuplicates().dropFirst().map { _ in () }
         .eraseToAnyPublisher(),
@@ -73,13 +92,51 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         .eraseToAnyPublisher(),
     ]
     Publishers.MergeMany(dashboardChanges)
+      .receive(on: DispatchQueue.main)
       .sink { [weak self] in
         guard let self else { return }
-        if self.popover.isShown {
+        if self.panel.isPresented {
           self.updateDashboardRootView()
+          self.positionPanel()
         }
-        self.updatePopoverSampling()
+        self.updatePanelSampling()
       }
+      .store(in: &cancellables)
+
+    settings.$menuBarAutoHide
+      .removeDuplicates()
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] isEnabled in
+        guard let self else { return }
+        if isEnabled { self.scheduleHideIfNeeded() } else { self.hideTask?.cancel() }
+      }
+      .store(in: &cancellables)
+
+    NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)
+      .sink { [weak self] _ in
+        self?.menuTrackingDepth += 1
+        self?.hideTask?.cancel()
+      }
+      .store(in: &cancellables)
+    NotificationCenter.default.publisher(for: NSMenu.didEndTrackingNotification)
+      .sink { [weak self] _ in
+        guard let self else { return }
+        self.menuTrackingDepth = max(0, self.menuTrackingDepth - 1)
+        self.scheduleHideIfNeeded()
+      }
+      .store(in: &cancellables)
+    NSWorkspace.shared.notificationCenter
+      .publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
+      .sink { [weak self] _ in
+        guard let self else { return }
+        self.panel.updateMaterial(
+          style: self.settings.liquidGlassStyle
+        )
+      }
+      .store(in: &cancellables)
+
+    NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
+      .sink { [weak self] _ in self?.panel.close() }
       .store(in: &cancellables)
   }
 
@@ -123,7 +180,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     button.title = ""
     button.toolTip = "MacScope"
     button.target = self
-    button.action = #selector(togglePopover(_:))
+    button.action = #selector(toggleDashboard(_:))
     button.sendAction(on: [.leftMouseUp])
 
     statusItem = item
@@ -132,12 +189,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
   private func removeStatusItem() {
     guard let statusItem else { return }
-    popover.close()
+    panel.close()
     monitor.setMetricsSampling(false, for: .menuBar)
     monitor.setProcessSampling(false, for: .menuBar)
     NSStatusBar.system.removeStatusItem(statusItem)
     self.statusItem = nil
-    statusShowsCompactText = nil
+    statusContentView = nil
   }
 
   private func updateStatusItemContent() {
@@ -149,56 +206,77 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
       temperatureUnit: settings.temperatureUnit
     )
 
-    let compactText = presentation.compactText
-    let showsCompactText = compactText != nil
-    if statusShowsCompactText != showsCompactText {
-      statusShowsCompactText = showsCompactText
-      button.image = showsCompactText
-        ? MenuBarLogoAsset.compactStatusImage
-        : MenuBarLogoAsset.image
-      button.imagePosition = showsCompactText ? .imageLeading : .imageOnly
-      statusItem.length = showsCompactText
-        ? NSStatusItem.variableLength
-        : NSStatusItem.squareLength
-    }
-    let title = compactText ?? ""
-    if button.title != title {
-      button.title = title
+    button.title = ""
+    if presentation.metrics.isEmpty {
+      statusContentView?.removeFromSuperview()
+      statusContentView = nil
+      button.image = MenuBarLogoAsset.image
+      button.imagePosition = .imageOnly
+      statusItem.length = NSStatusItem.squareLength
+    } else {
+      let width = MenuBarStatusLayout(metrics: presentation.metrics).width
+      if statusItem.length != width { statusItem.length = width }
+      button.image = nil
+      if statusContentView == nil {
+        let view = MenuBarNativeStatusView(frame: button.bounds)
+        view.autoresizingMask = [.width, .height]
+        button.addSubview(view)
+        statusContentView = view
+      }
+      statusContentView?.frame = button.bounds
+      statusContentView?.presentation = presentation
     }
     button.setAccessibilityLabel(presentation.accessibilityLabel)
   }
 
-  @objc private func togglePopover(_ sender: NSStatusBarButton) {
-    if popover.isShown {
-      popover.performClose(sender)
+  @objc private func toggleDashboard(_ sender: NSStatusBarButton) {
+    if panel.isPresented {
+      dismissPanel()
       return
     }
 
-    updateDashboardRootView()
+    hideTask?.cancel()
+    if !panel.isVisible { updateDashboardRootView() }
+    guard let anchor = positionPanel() else { return }
+    pointerHasEntered = false
     sender.highlight(true)
-    popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
-    updatePopoverSampling()
+    statusContentView?.needsDisplay = true
+    panel.present(from: anchor)
+    installEventMonitors()
+    if panel.frame.contains(NSEvent.mouseLocation) { pointerChanged(isInside: true) }
+    updatePanelSampling()
   }
 
-  private func updatePopoverSampling() {
-    monitor.setMetricsSampling(popover.isShown, for: .menuBar)
+  private func dismissPanel() {
+    hideTask?.cancel()
+    hideTask = nil
+    panel.dismiss()
+  }
+
+  private func updatePanelSampling() {
+    monitor.setMetricsSampling(panel.isVisible, for: .menuBar)
     monitor.setProcessSampling(
-      popover.isShown && settings.menuBarModules.contains(.processes),
+      panel.isVisible && settings.menuBarModules.contains(.processes),
       for: .menuBar
     )
   }
 
   private func dashboardRootView() -> AnyView {
-    AnyView(
-      MenuBarDashboardView { [weak self] in
-        self?.openMainWindow()
-      }
+    let maximumHeight = (statusItem?.button?.window?.screen?.visibleFrame.height ?? 800) - 20
+    return AnyView(
+      MenuBarDashboardView(
+        maximumHeight: maximumHeight,
+        openMainWindow: { [weak self] in self?.openMainWindow() },
+        openSettings: { [weak self] in
+          self?.dismissPanel()
+          AppWindowActions.openSettings()
+        }
+      )
       .environmentObject(monitor)
       .environmentObject(monitor.metrics)
       .environmentObject(settings)
       .environmentObject(navigation)
       .environment(\.locale, settings.language.locale)
-      .preferredColorScheme(settings.appearance.colorScheme)
       .tint(settings.activeTheme.accentColor)
     )
   }
@@ -206,15 +284,99 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
   private func updateDashboardRootView() {
     hostingController.rootView = dashboardRootView()
     hostingController.view.layoutSubtreeIfNeeded()
-    popover.contentSize = hostingController.view.fittingSize
+    panel.updateMaterial(style: settings.liquidGlassStyle)
+    panel.setContentSize(MenuBarDashboardView.contentSize(
+      modules: settings.menuBarModules,
+      processLimit: settings.menuBarProcessLimit,
+      maximumHeight: (statusItem?.button?.window?.screen?.visibleFrame.height ?? 800) - 20
+    ))
   }
 
   private func openMainWindow() {
-    popover.performClose(nil)
+    dismissPanel()
     openMainWindowHandler?()
     DispatchQueue.main.async {
       AppWindowActions.activate()
       AppWindowActions.mainWindow?.makeKeyAndOrderFront(nil)
     }
+  }
+
+  @discardableResult
+  private func positionPanel() -> NSRect? {
+    guard let button = statusItem?.button, let window = button.window else { return nil }
+    let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
+    let visibleFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? anchor
+    let x = min(max(anchor.maxX - panel.frame.width, visibleFrame.minX + 8),
+      visibleFrame.maxX - panel.frame.width - 8)
+    let y = max(visibleFrame.minY + 8, anchor.minY - 6 - panel.frame.height)
+    panel.setFrameOrigin(NSPoint(x: x, y: y))
+    return anchor
+  }
+
+  private func pointerChanged(isInside: Bool) {
+    if isInside {
+      pointerHasEntered = true
+      hideTask?.cancel()
+    } else {
+      scheduleHideIfNeeded()
+    }
+  }
+
+  private func scheduleHideIfNeeded() {
+    hideTask?.cancel()
+    guard panel.isPresented, settings.menuBarAutoHide, pointerHasEntered,
+      menuTrackingDepth == 0, panel.attachedSheet == nil
+    else { return }
+
+    hideTask = Task { [weak self] in
+      try? await Task.sleep(nanoseconds: 250_000_000)
+      guard let self, !Task.isCancelled, self.panel.isPresented,
+        self.settings.menuBarAutoHide, self.menuTrackingDepth == 0,
+        self.panel.attachedSheet == nil,
+        !self.panel.frame.contains(NSEvent.mouseLocation)
+      else { return }
+      self.dismissPanel()
+    }
+  }
+
+  private func installEventMonitors() {
+    removeEventMonitors()
+    localEventMonitor = NSEvent.addLocalMonitorForEvents(
+      matching: [.leftMouseDown, .rightMouseDown, .keyDown]
+    ) { [weak self] event in
+      guard let self, self.panel.isPresented else { return event }
+      if event.type == .keyDown {
+        if event.keyCode == 53, event.window === self.panel, self.panel.attachedSheet == nil {
+          self.dismissPanel()
+          return nil
+        }
+      } else {
+        self.closeIfPointerIsOutside()
+      }
+      return event
+    }
+    globalEventMonitor = NSEvent.addGlobalMonitorForEvents(
+      matching: [.leftMouseDown, .rightMouseDown]
+    ) { [weak self] _ in
+      self?.closeIfPointerIsOutside()
+    }
+  }
+
+  private func closeIfPointerIsOutside() {
+    guard panel.isPresented, menuTrackingDepth == 0, panel.attachedSheet == nil,
+      !panel.frame.contains(NSEvent.mouseLocation)
+    else { return }
+    if let button = statusItem?.button, let window = button.window {
+      let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
+      if anchor.contains(NSEvent.mouseLocation) { return }
+    }
+    dismissPanel()
+  }
+
+  private func removeEventMonitors() {
+    if let localEventMonitor { NSEvent.removeMonitor(localEventMonitor) }
+    if let globalEventMonitor { NSEvent.removeMonitor(globalEventMonitor) }
+    localEventMonitor = nil
+    globalEventMonitor = nil
   }
 }

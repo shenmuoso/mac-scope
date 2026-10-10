@@ -5,7 +5,9 @@ set -euo pipefail
 SCRIPT_DIR=${0:A:h}
 NATIVE_ROOT=${SCRIPT_DIR:h}
 CONFIGURATION=${1:-release}
-OUTPUT_PATH=${2:-"$NATIVE_ROOT/build/MacScope-0.4.11.dmg"}
+SOURCE_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw "$NATIVE_ROOT/Resources/Info.plist")
+DMG_VERSION=${MACSCOPE_VERSION:-$SOURCE_VERSION}
+OUTPUT_PATH=${2:-"$NATIVE_ROOT/build/MacScope-$DMG_VERSION.dmg"}
 STAGING_DIR="$NATIVE_ROOT/build/dmg-root"
 
 case "$CONFIGURATION" in
@@ -28,6 +30,7 @@ APP_PATH=$("$SCRIPT_DIR/build_app.sh" "$CONFIGURATION")
 /usr/bin/hdiutil create \
     -volname "MacScope" \
     -srcfolder "$STAGING_DIR" \
+    -fs HFS+ \
     -format UDZO \
     -ov \
     "$OUTPUT_PATH"

@@ -3,56 +3,63 @@ import SwiftUI
 
 @MainActor
 enum MenuBarLogoAsset {
-  static let image = makeImage(trailingSpacing: 0)
-  static let compactStatusImage = makeImage(trailingSpacing: 6)
+  static let image = makeImage()
 
-  private static func makeImage(trailingSpacing: CGFloat) -> NSImage {
+  private static func makeImage() -> NSImage {
     let image = NSImage(
-      size: NSSize(width: 16 + trailingSpacing, height: 16),
+      size: NSSize(width: 16, height: 16),
       flipped: true
     ) { bounds in
-      let outlineWidth: CGFloat = 1.25
-      let waveformWidth: CGFloat = 1.15
-      let drawingBounds = NSRect(x: bounds.minX, y: bounds.minY, width: 16, height: 16)
-      let symbolBounds = drawingBounds.insetBy(dx: 1, dy: 1)
-
-      NSColor.black.setStroke()
-
-      let outline = NSBezierPath(ovalIn: symbolBounds)
-      outline.lineWidth = outlineWidth
-      outline.stroke()
-
-      let points: [CGPoint] = [
-        CGPoint(x: 0.14, y: 0.54),
-        CGPoint(x: 0.28, y: 0.54),
-        CGPoint(x: 0.36, y: 0.39),
-        CGPoint(x: 0.45, y: 0.71),
-        CGPoint(x: 0.55, y: 0.27),
-        CGPoint(x: 0.64, y: 0.59),
-        CGPoint(x: 0.72, y: 0.46),
-        CGPoint(x: 0.86, y: 0.46),
-      ]
-      let waveform = NSBezierPath()
-      for (index, point) in points.enumerated() {
-        let scaled = CGPoint(
-          x: drawingBounds.minX + point.x * drawingBounds.width,
-          y: drawingBounds.minY + point.y * drawingBounds.height
-        )
-        if index == 0 {
-          waveform.move(to: scaled)
-        } else {
-          waveform.line(to: scaled)
-        }
-      }
-      waveform.lineWidth = waveformWidth
-      waveform.lineCapStyle = .round
-      waveform.lineJoinStyle = .round
-      waveform.stroke()
+      draw(in: NSRect(x: bounds.minX, y: bounds.minY, width: 16, height: 16), color: .black)
       return true
     }
     image.isTemplate = true
     image.accessibilityDescription = "MacScope"
     return image
+  }
+
+  static func draw(in drawingBounds: NSRect, color: NSColor) {
+    let unit = drawingBounds.width / 16
+    func point(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
+      NSPoint(x: drawingBounds.minX + x * unit, y: drawingBounds.minY + y * unit)
+    }
+    color.setStroke()
+    let processor = NSBezierPath(
+      roundedRect: NSRect(
+        origin: point(3.25, 3.25), size: NSSize(width: 9.5 * unit, height: 9.5 * unit)
+      ),
+      xRadius: 2 * unit,
+      yRadius: 2 * unit
+    )
+    processor.lineWidth = 1.4 * unit
+    processor.stroke()
+
+    let terminals = NSBezierPath()
+    for position: CGFloat in [5, 8, 11] {
+      terminals.move(to: point(position, 1))
+      terminals.line(to: point(position, 3))
+      terminals.move(to: point(position, 13))
+      terminals.line(to: point(position, 15))
+      terminals.move(to: point(1, position))
+      terminals.line(to: point(3, position))
+      terminals.move(to: point(13, position))
+      terminals.line(to: point(15, position))
+    }
+    terminals.lineWidth = 1.4 * unit
+    terminals.lineCapStyle = .round
+    terminals.stroke()
+
+    let activity = NSBezierPath()
+    activity.move(to: point(5, 8.25))
+    activity.line(to: point(6.25, 8.25))
+    activity.line(to: point(7.25, 6.25))
+    activity.line(to: point(8.75, 9.75))
+    activity.line(to: point(9.75, 7.75))
+    activity.line(to: point(11, 7.75))
+    activity.lineWidth = 1.1 * unit
+    activity.lineCapStyle = .round
+    activity.lineJoinStyle = .round
+    activity.stroke()
   }
 }
 
@@ -83,18 +90,8 @@ struct MenuBarStatusContent: View {
       temperatureUnit: temperatureUnit
     )
 
-    HStack(spacing: 10) {
-      MenuBarLogo()
-        .frame(width: 16, height: 16)
-
-      if let compactText = presentation.compactText {
-        Text(compactText)
-          .monospacedDigit()
-          .lineLimit(1)
-          .fixedSize(horizontal: true, vertical: false)
-      }
-    }
-    .fixedSize()
+    MenuBarStatusPreview(presentation: presentation)
+    .frame(width: MenuBarStatusLayout(metrics: presentation.metrics).width, height: 22)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(presentation.accessibilityLabel)
   }
@@ -106,14 +103,19 @@ struct MenuBarStatusPresentation {
   let selectedMetrics: [MenuBarMetric]
   let temperatureUnit: TemperatureUnit
 
+  var metrics: [MenuBarMetric] {
+    guard displayMode == .compact else { return [] }
+    return selectedMetrics.filter { $0 != .gpu || GPUMetricsReader.isSupported }
+  }
+
   var compactText: String? {
-    guard displayMode == .compact, !selectedMetrics.isEmpty else { return nil }
-    return selectedMetrics.map(value(for:)).joined(separator: " · ")
+    guard !metrics.isEmpty else { return nil }
+    return metrics.map(value(for:)).joined(separator: " · ")
   }
 
   var accessibilityLabel: String {
     guard compactText != nil else { return "MacScope" }
-    let values = selectedMetrics.map { metric in
+    let values = metrics.map { metric in
       "\(metric.title), \(value(for: metric))"
     }.joined(separator: ", ")
     return "MacScope, \(values)"
@@ -123,6 +125,8 @@ struct MenuBarStatusPresentation {
     switch metric {
     case .cpu:
       return "CPU \(DisplayFormat.compactPercent(snapshot.cpu.total))"
+    case .gpu:
+      return "GPU \(snapshot.gpu.totalPercent.map(DisplayFormat.compactPercent) ?? "--")"
     case .memory:
       return "MEM \(DisplayFormat.compactPercent(snapshot.memory.fraction * 100))"
     case .disk:

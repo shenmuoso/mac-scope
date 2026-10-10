@@ -41,9 +41,13 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   var pageDescription: LocalizedStringKey {
     switch self {
     case .overview:
-      "Live CPU, memory, disk, and network activity."
+      GPUMetricsReader.isSupported
+        ? "Live CPU, GPU, memory, disk, and network activity."
+        : "Live CPU, memory, disk, and network activity."
     case .performancePower:
-      "Real-time CPU, power, temperature, and cooling activity."
+      GPUMetricsReader.isSupported
+        ? "Real-time CPU, GPU, power, temperature, and cooling activity."
+        : "Real-time CPU, power, temperature, and cooling activity."
     case .processes:
       "Inspect, group, and manage running processes and software."
     case .systemInfo:

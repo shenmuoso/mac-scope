@@ -73,6 +73,20 @@ struct DashboardView: View {
 
       OverviewMetricDivider()
 
+      if GPUMetricsReader.isSupported {
+        OverviewMetricRow(
+          title: "GPU",
+          systemImage: "square.3.layers.3d",
+          value: metrics.snapshot.gpu.totalPercent.map(DisplayFormat.percent) ?? "--",
+          detail: metrics.snapshot.gpu.totalPercent == nil
+            ? localized("GPU Telemetry Unavailable") : localized("Apple Silicon GPU"),
+          dial: metrics.snapshot.gpu.totalPercent.map {
+            .utilization(fraction: $0 / 100, color: MetricColorScale.utilization(fraction: $0 / 100))
+          } ?? .unavailable
+        )
+        OverviewMetricDivider()
+      }
+
       OverviewMetricRow(
         title: "Memory",
         systemImage: "memorychip",
@@ -196,6 +210,15 @@ struct DashboardView: View {
           title: "CPU",
           value: DisplayFormat.percent(presentedPoint?.cpuPercent ?? metrics.snapshot.cpu.total)
         )
+        if GPUMetricsReader.isSupported {
+          OverviewTrendValue(
+            color: settings.activeTheme.gpuColor,
+            title: "GPU",
+            value: (hoveredTimestamp == nil
+              ? metrics.snapshot.gpu.totalPercent : presentedPoint?.gpuPercent)
+              .map(DisplayFormat.percent) ?? "--"
+          )
+        }
         OverviewTrendValue(
           color: settings.activeTheme.memoryColor,
           title: "Memory",
@@ -219,6 +242,17 @@ struct DashboardView: View {
           .foregroundStyle(settings.activeTheme.cpuColor)
           .interpolationMethod(.catmullRom)
           .lineStyle(chartLineStyle)
+
+          if let gpuPercent = point.gpuPercent {
+            LineMark(
+              x: .value("Time", point.timestamp),
+              y: .value("GPU", gpuPercent),
+              series: .value("Series", "GPU")
+            )
+            .foregroundStyle(settings.activeTheme.gpuColor)
+            .interpolationMethod(.catmullRom)
+            .lineStyle(chartLineStyle)
+          }
 
           LineMark(
             x: .value("Time", point.timestamp),
@@ -457,6 +491,7 @@ struct DashboardView: View {
 }
 
 private enum OverviewMetricDialStyle {
+  case unavailable
   case utilization(fraction: Double, color: Color)
   case traffic(
     downloadFraction: Double,
@@ -509,6 +544,9 @@ private struct OverviewMetricDial: View {
   var body: some View {
     ZStack {
       switch style {
+      case .unavailable:
+        Circle()
+          .stroke(Color.primary.opacity(0.09), lineWidth: 6)
       case .utilization(let fraction, let color):
         Circle()
           .stroke(Color.primary.opacity(0.09), lineWidth: 6)

@@ -32,6 +32,20 @@ enum DisplayFormat {
     }
   }
 
+  static func menuBarRate(_ value: Double) -> String {
+    guard value.isFinite, value > 0 else { return "0 B/s" }
+    let units = ["B/s", "KB/s", "MB/s", "GB/s"]
+    var scaled = value
+    var unit = 0
+    while scaled >= 1_000, unit < units.count - 1 {
+      scaled /= 1_000
+      unit += 1
+    }
+    guard scaled < 1_000 else { return "999+ GB/s" }
+    let number = String(format: scaled < 10 && unit > 0 ? "%.1f" : "%.0f", scaled)
+    return "\(number) \(units[unit])"
+  }
+
   static func power(_ watts: Double?) -> String? {
     guard let watts, watts.isFinite, watts >= 0 else { return nil }
     return String(format: watts < 100 ? "%.1f W" : "%.0f W", watts)
