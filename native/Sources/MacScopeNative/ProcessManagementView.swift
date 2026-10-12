@@ -97,14 +97,12 @@ struct ProcessManagementView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .processes)
-
+    DetailWorkspace {
       HStack(spacing: 0) {
         VStack(spacing: 0) {
           processHeader
           processContent
-          Divider()
+          DetailDivider()
           ProcessStatusBar(
             isPaused: monitor.isPaused,
             visibleCount: filteredProcesses.count,
@@ -112,7 +110,7 @@ struct ProcessManagementView: View {
           )
         }
         if showsInspector {
-          Divider()
+          DetailDivider()
           inspectorPane
             .frame(width: 340)
         }
@@ -285,6 +283,22 @@ struct ProcessManagementView: View {
   }
 
   private var processHeader: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 12) {
+        processSummary
+        Spacer(minLength: 12)
+        processFilters
+      }
+      VStack(alignment: .leading, spacing: 10) {
+        processSummary
+        processFilters
+      }
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+  }
+
+  private var processSummary: some View {
     HStack(spacing: 8) {
       Text(dashboardTitle)
         .font(.headline)
@@ -292,45 +306,32 @@ struct ProcessManagementView: View {
         .font(.subheadline)
         .foregroundStyle(.secondary)
       Spacer()
-
-      Toggle("Group by Software", isOn: $sortsBySoftware)
-        .toggleStyle(.switch)
-        .fixedSize()
-        .help("Group by Software")
-
-      Menu {
-        ForEach(ProcessOriginFilter.allCases) { filter in
-          Button {
-            originFilter = filter
-          } label: {
-            if originFilter == filter {
-              Label(filter.title, systemImage: "checkmark")
-            } else {
-              Text(filter.title)
-            }
-          }
-        }
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: "line.3.horizontal.decrease.circle")
-            .frame(width: 16)
-          Text(originFilter.title)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-          Spacer(minLength: 0)
-        }
-        .frame(width: 196, alignment: .leading)
-      }
-      .help("Process Source")
-
       if let selectedProcess {
         Text("PID \(selectedProcess.pid)")
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
     }
-    .padding(.horizontal, 16)
-    .frame(height: 44)
+    .fixedSize(horizontal: true, vertical: false)
+  }
+
+  private var processFilters: some View {
+    HStack(spacing: 12) {
+      Toggle("Group by Software", isOn: $sortsBySoftware)
+        .toggleStyle(.switch)
+        .fixedSize()
+        .help("Group by Software")
+
+      Picker("Process Source", selection: $originFilter) {
+        ForEach(ProcessOriginFilter.allCases) { filter in
+          Text(filter.title).tag(filter)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .frame(width: 180)
+      .help("Process Source")
+    }
   }
 
   private var processTable: some View {
@@ -549,7 +550,6 @@ private struct SoftwareProcessGroupList: View {
     .foregroundStyle(.secondary)
     .padding(.horizontal, 34)
     .frame(height: 30)
-    .background(Color(nsColor: .controlBackgroundColor))
   }
 
   private func sortHeader(

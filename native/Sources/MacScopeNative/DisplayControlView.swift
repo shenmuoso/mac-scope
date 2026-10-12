@@ -416,8 +416,6 @@ struct DisplayControlView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .displays)
-
       if store.isLoading {
         ProgressView("Loading Displays")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -521,20 +519,21 @@ struct DisplayControlView: View {
 
   private func displayDetail(_ display: DisplaySummary) -> some View {
     ZStack {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
+      Form {
+        Section {
           displayIdentity(display)
           currentModeSection(display)
-          Divider()
-          supportedModesSection(display)
-          Divider()
-          DisplayAdjustmentsView(store: store, display: display)
-            .id(display.id)
         }
-        .frame(maxWidth: 1040, alignment: .leading)
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .center)
+        Section {
+          supportedModesSection(display)
+        }
+        DisplayAdjustmentsView(store: store, display: display)
+          .id(display.id)
       }
+      .formStyle(.grouped)
+      .frame(maxWidth: 1040)
+      .frame(maxWidth: .infinity)
+      .compactNativeScrollers()
 
       if let pendingChange = store.pendingChange,
         let changedDisplay = store.displays.first(where: { $0.displayID == pendingChange.displayID }),
@@ -552,7 +551,6 @@ struct DisplayControlView: View {
         .font(.system(size: 34, weight: .light))
         .foregroundStyle(.tint)
         .frame(width: 56, height: 56)
-        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
 
       VStack(alignment: .leading, spacing: 5) {
         Menu {
@@ -565,7 +563,7 @@ struct DisplayControlView: View {
             }
           }
         } label: {
-          Text(display.name).font(.title2.weight(.semibold)).lineLimit(1)
+          Text(display.name).font(.headline).lineLimit(1)
         }
         .menuStyle(.borderlessButton)
         .fixedSize(horizontal: false, vertical: true)
@@ -590,15 +588,13 @@ struct DisplayControlView: View {
   }
 
   private func currentModeSection(_ display: DisplaySummary) -> some View {
-    return VStack(alignment: .leading, spacing: 0) {
+    return Group {
       if let mode = display.currentMode {
-        HStack(alignment: .top, spacing: 0) {
-          metric("Resolution", value: mode.resolutionLabel, detail: mode.isHiDPI ? "HiDPI" : nil)
-          Divider().frame(height: 44)
-          metric("Pixel Resolution", value: mode.pixelResolutionLabel, detail: nil)
-          Divider().frame(height: 44)
-          metric("Refresh Rate", value: mode.refreshLabel, detail: nil)
+        LabeledContent("Resolution") {
+          Text(mode.resolutionLabel + (mode.isHiDPI ? " · HiDPI" : ""))
         }
+        LabeledContent("Pixel Resolution", value: mode.pixelResolutionLabel)
+        LabeledContent("Refresh Rate", value: mode.refreshLabel)
       } else {
         unavailableText("Current display mode is unavailable.")
       }
@@ -677,24 +673,6 @@ struct DisplayControlView: View {
       .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
     }
     .zIndex(2)
-  }
-
-  private func metric(_ title: LocalizedStringKey, value: String, detail: String?) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(title)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Text(value)
-        .font(.body.weight(.medium))
-        .monospacedDigit()
-      if let detail {
-        Text(detail)
-          .font(.caption2)
-          .foregroundStyle(.tint)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 14)
   }
 
   private func statusBadge(_ title: LocalizedStringKey, systemImage: String) -> some View {

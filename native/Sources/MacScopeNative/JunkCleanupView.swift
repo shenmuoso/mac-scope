@@ -17,15 +17,13 @@ struct JunkCleanupView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .junk)
-
+    DetailWorkspace {
       if store.junkItems.isEmpty, store.activity?.tool == .junk {
         MaintenanceActivityProminentView(tool: .junk)
       } else {
         if store.activity?.tool == .junk {
           MaintenanceActivityInlineView(tool: .junk)
-          Divider()
+          DetailDivider()
         }
 
         if store.junkItems.isEmpty {
@@ -44,9 +42,9 @@ struct JunkCleanupView: View {
           }
         } else {
           selectionBar
-          Divider()
+          DetailDivider()
           junkTable
-          Divider()
+          DetailDivider()
           SystemToolStatusBar(
             summary: localized(
               "%lld selected · %@",
@@ -138,7 +136,8 @@ struct JunkCleanupView: View {
       }
       .width(min: 180, ideal: 300)
     }
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   private var totalSize: UInt64 {

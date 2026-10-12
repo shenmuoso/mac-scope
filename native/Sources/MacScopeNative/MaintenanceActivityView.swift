@@ -111,7 +111,6 @@ struct MaintenanceActivityInlineView: View {
       }
       .frame(maxWidth: 960)
       .frame(maxWidth: .infinity)
-      .appMaterial(.toolbar)
       .transition(.opacity)
       .sheet(isPresented: $showsResults) {
         MaintenanceActivityResultsView(

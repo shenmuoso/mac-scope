@@ -91,10 +91,9 @@ struct StartupItemsView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .startupItems)
+    DetailWorkspace {
       sectionBar
-      Divider()
+      DetailDivider()
 
       if store.isScanning, !store.hasScanned {
         scanningView
@@ -207,7 +206,6 @@ struct StartupItemsView: View {
     }
     .padding(.horizontal, 14)
     .frame(height: 50)
-    .appMaterial(.toolbar)
   }
 
   @ViewBuilder
@@ -242,7 +240,7 @@ struct StartupItemsView: View {
         }
       } else {
         loginItemsTable
-        Divider()
+        DetailDivider()
         statusBar
       }
     }
@@ -276,7 +274,8 @@ struct StartupItemsView: View {
       .width(min: 250, ideal: 420)
     }
     .id(store.tableIdentity)
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   @ViewBuilder
@@ -295,7 +294,7 @@ struct StartupItemsView: View {
       }
     } else {
       backgroundItemsTable
-      Divider()
+      DetailDivider()
       statusBar
     }
   }
@@ -337,7 +336,8 @@ struct StartupItemsView: View {
       .width(min: 220, ideal: 360)
     }
     .id(store.tableIdentity)
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   @ViewBuilder
@@ -372,8 +372,9 @@ struct StartupItemsView: View {
         }
       }
       .listStyle(.inset)
-      .compactNativeScrollers()
-      Divider()
+      .scrollContentBackground(.hidden)
+      .compactNativeScrollers(clearsBackground: true)
+      DetailDivider()
       statusBar
     }
   }

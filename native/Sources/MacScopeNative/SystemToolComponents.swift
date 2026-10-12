@@ -14,42 +14,68 @@ enum WorkspaceIconCache {
   }
 }
 
-struct SystemToolPageHeader: View {
-  let destination: AppDestination
+enum DetailLayout {
+  static let pageInset: CGFloat = 24
+  static let groupSpacing: CGFloat = 20
+  static let groupInset: CGFloat = 16
+  static let cornerRadius: CGFloat = 8
+  static let readingWidth: CGFloat = 960
+}
+
+extension View {
+  func detailGroup(inset: CGFloat = DetailLayout.groupInset) -> some View {
+    padding(inset)
+      .background { DetailGroupBackground() }
+  }
+
+  func detailPageInsets() -> some View {
+    padding(.horizontal, DetailLayout.pageInset)
+      .padding(.top, 16)
+      .padding(.bottom, 24)
+  }
+}
+
+private struct DetailGroupBackground: View {
+  @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.colorSchemeContrast) private var contrast
 
   var body: some View {
-    HStack(spacing: 12) {
-      ZStack {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .fill(destination.iconColor.gradient)
-          .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-              .stroke(.white.opacity(0.18), lineWidth: 0.5)
-          }
-
-        Image(systemName: destination.systemImage)
-          .symbolRenderingMode(.monochrome)
-          .font(.system(size: 20, weight: .medium))
-          .foregroundStyle(.white)
+    let shape = RoundedRectangle(cornerRadius: DetailLayout.cornerRadius, style: .continuous)
+    shape
+      .fill(Color(nsColor: .windowBackgroundColor))
+      .overlay {
+        shape.fill(Color.primary.opacity(colorScheme == .dark ? 0.055 : 0.035))
       }
-      .frame(width: 40, height: 40)
-      .shadow(color: .black.opacity(0.16), radius: 2, y: 1)
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text(destination.title)
-          .font(.title2.weight(.semibold))
-
-        Text(destination.pageDescription)
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
+      .overlay {
+        if contrast == .increased {
+          shape.strokeBorder(Color.primary.opacity(0.3), lineWidth: 1)
+        }
       }
-      Spacer(minLength: 0)
+  }
+}
+
+struct DetailWorkspace<Content: View>: View {
+  @ViewBuilder let content: Content
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      content
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 20)
-    .padding(.vertical, 16)
-    .accessibilityElement(children: .combine)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .detailGroup(inset: 0)
+    .clipShape(RoundedRectangle(cornerRadius: DetailLayout.cornerRadius, style: .continuous))
+    .detailPageInsets()
+  }
+}
+
+struct DetailDivider: View {
+  var body: some View {
+    Divider()
+      .padding(.horizontal, DetailLayout.groupInset)
   }
 }
 
@@ -122,8 +148,7 @@ struct SystemToolStatusBar<Actions: View>: View {
       Spacer()
       actions
     }
-    .padding(.horizontal, 14)
-    .frame(height: 46)
-    .appMaterial(.toolbar)
+    .padding(.horizontal, DetailLayout.groupInset)
+    .frame(minHeight: 46)
   }
 }

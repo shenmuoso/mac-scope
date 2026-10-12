@@ -33,9 +33,7 @@ struct PortToolView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .ports)
-
+    DetailWorkspace {
       if store.isLoading && store.records.isEmpty {
         ProgressView("Reading Listening Ports")
           .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -53,7 +51,7 @@ struct PortToolView: View {
         portTable
       }
 
-      Divider()
+      DetailDivider()
       SystemToolStatusBar(
         summary: localized("%lld listening ports", Int64(filteredRecords.count))
       ) {
@@ -178,7 +176,8 @@ struct PortToolView: View {
       }
       .width(min: 130, ideal: 210)
     }
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   private func scopeTitle(_ scope: PortScope) -> LocalizedStringKey {

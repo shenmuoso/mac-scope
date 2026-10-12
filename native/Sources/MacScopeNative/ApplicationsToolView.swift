@@ -25,15 +25,13 @@ struct ApplicationsToolView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .applications)
-
+    DetailWorkspace {
       if store.applications.isEmpty, store.activity?.tool == .applications {
         MaintenanceActivityProminentView(tool: .applications)
       } else {
         if store.activity?.tool == .applications {
           MaintenanceActivityInlineView(tool: .applications)
-          Divider()
+          DetailDivider()
         }
 
         if store.applications.isEmpty {
@@ -52,7 +50,7 @@ struct ApplicationsToolView: View {
           }
         } else {
           applicationTable
-          Divider()
+          DetailDivider()
           SystemToolStatusBar(summary: applicationSummary) {
             if let selectedRecord {
               Text(DisplayFormat.bytes(selectedRecord.totalSize))
@@ -161,7 +159,8 @@ struct ApplicationsToolView: View {
       .width(min: 160, ideal: 260)
     }
     .onTapGesture(count: 2, perform: beginUninstall)
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   private var applicationSummary: String {

@@ -29,7 +29,14 @@
 "1 second" = "1 秒";
 "2 seconds" = "2 秒";
 "5 seconds" = "5 秒";
-"Temperature" = "温度单位";
+"Temperature" = "温度";
+"Temperature Unit" = "温度单位";
+"Close Process Info" = "关闭进程信息";
+"Disk Read Total" = "累计磁盘读取";
+"Disk Write Total" = "累计磁盘写入";
+"Downloaded" = "累计下载";
+"Uploaded" = "累计上传";
+"Disk" = "磁盘";
 "Celsius" = "摄氏度";
 "Fahrenheit" = "华氏度";
 "Window" = "窗口";

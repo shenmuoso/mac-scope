@@ -10,18 +10,14 @@ struct DashboardView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .overview)
-
       ScrollView {
         overviewContent
           .frame(maxWidth: 980)
           .frame(maxWidth: .infinity)
-          .padding(.horizontal, 24)
-          .padding(.bottom, 28)
+          .detailPageInsets()
       }
       .compactNativeScrollers()
 
-      Divider()
       OverviewStatusBar(isPaused: monitor.isPaused)
     }
     .background(Color(nsColor: .windowBackgroundColor))
@@ -133,12 +129,7 @@ struct DashboardView: View {
         )
       )
     }
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-    }
+    .detailGroup(inset: 0)
   }
 
   private var activityTrends: some View {
@@ -163,8 +154,6 @@ struct DashboardView: View {
       }
       .padding(.horizontal, 16)
       .frame(height: 48)
-
-      Divider()
 
       if metrics.history.count > 1 {
         systemLoadTrack
@@ -192,12 +181,7 @@ struct DashboardView: View {
         collectingView
       }
     }
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-    }
+    .detailGroup(inset: 0)
   }
 
   private var systemLoadTrack: some View {

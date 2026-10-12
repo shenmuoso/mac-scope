@@ -8,8 +8,6 @@ struct HardwareInfoView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      HardwareDeviceHeader(snapshot: store.snapshot)
-
       Group {
         if let snapshot = store.snapshot {
           hardwareList(snapshot)
@@ -55,6 +53,9 @@ struct HardwareInfoView: View {
 
   private func hardwareList(_ snapshot: HardwareSnapshot) -> some View {
     Form {
+      Section {
+        HardwareDeviceHeader(snapshot: snapshot)
+      }
       Section("Mac") {
         infoRow("Model", value: snapshot.machineName, systemImage: "laptopcomputer")
         infoRow("Model Identifier", value: snapshot.modelIdentifier, systemImage: "number")
@@ -205,7 +206,7 @@ struct HardwareInfoView: View {
       }
     }
     .formStyle(.grouped)
-    .frame(maxWidth: 880)
+    .frame(maxWidth: DetailLayout.readingWidth)
     .frame(maxWidth: .infinity)
     .background(Color(nsColor: .windowBackgroundColor))
     .compactNativeScrollers()
@@ -357,20 +358,8 @@ private struct HardwareDeviceHeader: View {
           .foregroundStyle(.secondary)
       }
     }
-    .frame(maxWidth: .infinity, minHeight: 190)
-    .padding(.horizontal, 28)
-    .padding(.vertical, 14)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-    }
-    .frame(maxWidth: 880)
     .frame(maxWidth: .infinity)
-    .padding(.horizontal, 24)
-    .padding(.top, 16)
-    .padding(.bottom, 14)
+    .padding(.vertical, 14)
     .accessibilityElement(children: .combine)
   }
 }
@@ -382,8 +371,6 @@ struct BatteryHealthView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .battery)
-
       Group {
         if let battery = store.snapshot {
           batteryDashboard(battery)
@@ -415,12 +402,9 @@ struct BatteryHealthView: View {
   }
 
   private func batteryDashboard(_ battery: BatterySnapshot) -> some View {
-    ScrollView {
-      VStack(spacing: 16) {
-        LazyVGrid(
-          columns: [GridItem(.adaptive(minimum: 190, maximum: 260), spacing: 16)],
-          spacing: 16
-        ) {
+    Form {
+      Section {
+        HStack(spacing: 24) {
           BatteryMetricGauge(
             title: "Current Charge",
             systemImage: batterySymbol(battery),
@@ -430,39 +414,33 @@ struct BatteryHealthView: View {
             tint: chargeColor(battery.chargePercent)
           )
 
-          BatteryMetricGauge(
-            title: "Maximum Capacity",
-            systemImage: "heart.text.square",
-            value: battery.healthPercent.map { $0 / 100 },
-            valueText: battery.healthPercent.map(DisplayFormat.compactPercent) ?? "--",
-            detail: conditionTitle(battery.condition),
-            tint: battery.healthPercent.map(healthColor) ?? .secondary
-          )
-
-          BatteryMetricGauge(
-            title: "Cycle Count",
-            systemImage: "arrow.triangle.2.circlepath",
-            value: cycleProgress(battery),
-            valueText: String(battery.cycleCount),
-            detail: cycleSummary(battery),
-            tint: cycleColor(battery)
-          )
-        }
-
-        if !capacityItems(battery).isEmpty {
-          capacityPanel(battery)
-        }
-
-        HStack(alignment: .top, spacing: 16) {
-          statusPanel(battery)
-          electricalPanel(battery)
+          .frame(width: 160)
+          VStack(spacing: 16) {
+            LabeledContent("Condition") {
+              Text(conditionTitle(battery.condition))
+                .foregroundStyle(battery.condition == .normal ? Color.secondary : Color.orange)
+            }
+            LabeledContent("Maximum Capacity") {
+              Text(battery.healthPercent.map(DisplayFormat.compactPercent) ?? "--")
+                .foregroundStyle(battery.healthPercent.map(healthColor) ?? .secondary)
+            }
+            LabeledContent("Cycle Count") {
+              Text(cycleSummary(battery))
+                .foregroundStyle(cycleColor(battery))
+            }
+          }
+          .monospacedDigit()
         }
       }
-      .frame(maxWidth: 900)
-      .frame(maxWidth: .infinity)
-      .padding(.horizontal, 24)
-      .padding(.bottom, 28)
+      if !capacityItems(battery).isEmpty {
+        capacityPanel(battery)
+      }
+      statusPanel(battery)
+      electricalPanel(battery)
     }
+    .formStyle(.grouped)
+    .frame(maxWidth: DetailLayout.readingWidth)
+    .frame(maxWidth: .infinity)
     .compactNativeScrollers()
   }
 
@@ -497,27 +475,24 @@ struct BatteryHealthView: View {
 
   private func statusPanel(_ battery: BatterySnapshot) -> some View {
     BatteryPanel(title: "Battery Status") {
-      VStack(spacing: 0) {
+      Group {
         BatteryDetailRow(
           title: "Power Source",
           systemImage: "powerplug",
           value: localized(battery.isExternalPowerConnected ? "Power Adapter" : "Battery")
         )
         if let minutes = battery.timeRemainingMinutes {
-          Divider()
           BatteryDetailRow(
             title: battery.isCharging ? "Time to Full" : "Time Remaining",
             systemImage: "clock",
             value: DisplayFormat.duration(TimeInterval(minutes * 60))
           )
         }
-        Divider()
         BatteryDetailRow(
           title: "Condition",
           systemImage: "heart",
           value: conditionTitle(battery.condition)
         )
-        Divider()
         BatteryDetailRow(
           title: "Temperature",
           systemImage: "thermometer.medium",
@@ -529,7 +504,7 @@ struct BatteryHealthView: View {
 
   private func electricalPanel(_ battery: BatterySnapshot) -> some View {
     BatteryPanel(title: "Electrical") {
-      VStack(spacing: 0) {
+      Group {
         BatteryDetailRow(
           title: "Voltage",
           systemImage: "bolt",
@@ -537,7 +512,6 @@ struct BatteryHealthView: View {
             String(format: "%.2f V", Double($0) / 1_000)
           } ?? "--"
         )
-        Divider()
         BatteryDetailRow(
           title: "Current",
           systemImage: "waveform.path",
@@ -661,9 +635,7 @@ private struct BatteryMetricGauge: View {
         .minimumScaleFactor(0.8)
     }
     .frame(maxWidth: .infinity, minHeight: 160)
-    .padding(14)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .padding(.vertical, 8)
   }
 }
 
@@ -677,15 +649,9 @@ private struct BatteryPanel<Content: View>: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      Text(title)
-        .font(.headline)
+    Section(title) {
       content
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(18)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
   }
 }
 
@@ -695,16 +661,14 @@ private struct BatteryDetailRow: View {
   let value: String
 
   var body: some View {
-    HStack(spacing: 10) {
-      Label(title, systemImage: systemImage)
-      Spacer(minLength: 12)
+    LabeledContent {
       Text(value)
         .foregroundStyle(.secondary)
         .monospacedDigit()
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
+        .textSelection(.enabled)
+    } label: {
+      Label(title, systemImage: systemImage)
     }
-    .frame(minHeight: 36)
   }
 }
 

@@ -104,6 +104,7 @@ struct SettingsView: View {
       .navigationSplitViewColumnWidth(min: 180, ideal: 205, max: 230)
     } detail: {
       settingsDetail
+        .frame(maxWidth: DetailLayout.readingWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appDetailBackground()
         .navigationTitle(activePane.title)
@@ -164,7 +165,7 @@ struct SettingsView: View {
           Text("2 seconds").tag(2.0)
           Text("5 seconds").tag(5.0)
         }
-        Picker("Temperature", selection: $settings.temperatureUnit) {
+        Picker("Temperature Unit", selection: $settings.temperatureUnit) {
           Text("Celsius").tag(TemperatureUnit.celsius)
           Text("Fahrenheit").tag(TemperatureUnit.fahrenheit)
         }

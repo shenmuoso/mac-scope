@@ -8,46 +8,41 @@ struct MemoryToolView: View {
   private var memory: MemoryUsage { metrics.snapshot.memory }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .memory)
-
-      if store.activity?.tool == .memory {
-        MaintenanceActivityInlineView(tool: .memory)
-        Divider()
-      }
-
-      ScrollView {
-        VStack(spacing: 28) {
-          memoryGauge
-          memoryBreakdown
-          Divider()
-            .frame(maxWidth: 620)
-          VStack(spacing: 8) {
-            Text("Release Inactive File Cache")
-              .font(.headline)
-            Text("macOS decides which cached data is eligible to release. Running applications are not closed.")
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-              .multilineTextAlignment(.center)
-              .frame(maxWidth: 480)
+    Form {
+      Section {
+        HStack(spacing: 24) {
+          memoryGauge.frame(width: 160)
+          VStack(spacing: 16) {
+            memoryValue("Used", value: memory.used)
+            memoryValue("Available", value: memory.available)
+            memoryValue("Installed", value: memory.total)
           }
-
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 28)
-        .padding(.vertical, 34)
       }
-      .compactNativeScrollers()
-    }
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button(action: { store.releaseMemory() }) {
-          Label("Release Memory", systemImage: "memorychip")
+      Section {
+        LabeledContent {
+          Button(action: { store.releaseMemory() }) {
+            Label("Release Memory", systemImage: "memorychip")
+          }
+          .disabled(store.isBusy)
+        } label: {
+          Text("Release Inactive File Cache")
         }
-        .help("Release Memory")
-        .disabled(store.isBusy)
+        Text("macOS decides which cached data is eligible to release. Running applications are not closed.")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if store.activity?.tool == .memory {
+        Section {
+          MaintenanceActivityInlineView(tool: .memory)
+        }
       }
     }
+    .formStyle(.grouped)
+    .frame(maxWidth: DetailLayout.readingWidth)
+    .frame(maxWidth: .infinity)
+    .compactNativeScrollers()
   }
 
   private var memoryGauge: some View {
@@ -71,31 +66,11 @@ struct MemoryToolView: View {
     }
   }
 
-  private var memoryBreakdown: some View {
-    HStack(spacing: 0) {
-      memoryValue("Used", value: memory.used)
-      Divider()
-        .frame(height: 48)
-      memoryValue("Available", value: memory.available)
-      Divider()
-        .frame(height: 48)
-      memoryValue("Installed", value: memory.total)
-    }
-    .frame(maxWidth: 620)
-    .padding(.vertical, 14)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-  }
-
   private func memoryValue(_ title: LocalizedStringKey, value: UInt64) -> some View {
-    VStack(spacing: 4) {
+    LabeledContent(title) {
       Text(DisplayFormat.bytes(value))
-        .font(.title3.weight(.semibold))
-        .monospacedDigit()
-      Text(title)
-        .font(.caption)
         .foregroundStyle(.secondary)
+        .monospacedDigit()
     }
-    .frame(maxWidth: .infinity)
   }
 }

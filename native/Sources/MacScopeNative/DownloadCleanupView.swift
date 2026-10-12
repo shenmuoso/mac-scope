@@ -36,24 +36,22 @@ struct DownloadCleanupView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .downloads)
-
+    DetailWorkspace {
       if store.downloadItems.isEmpty, store.activity?.tool == .downloads {
         MaintenanceActivityProminentView(tool: .downloads)
       } else {
         if store.activity?.tool == .downloads {
           MaintenanceActivityInlineView(tool: .downloads)
-          Divider()
+          DetailDivider()
         }
 
         if store.downloadItems.isEmpty {
           emptyState
         } else {
           filterBar
-          Divider()
+          DetailDivider()
           downloadTable
-          Divider()
+          DetailDivider()
           SystemToolStatusBar(
             summary: localized(
               "%lld selected · %@",
@@ -76,7 +74,10 @@ struct DownloadCleanupView: View {
           Text("90 Days").tag(90)
           Text("180 Days").tag(180)
         }
-        .frame(width: 150)
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .fixedSize()
+        .help("Older Than")
 
         Button(action: scan) {
           Label("Scan Downloads", systemImage: "magnifyingglass")
@@ -195,7 +196,8 @@ struct DownloadCleanupView: View {
       }
       .width(120)
     }
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   private func selectionBinding(for item: MaintenanceItem) -> Binding<Bool> {

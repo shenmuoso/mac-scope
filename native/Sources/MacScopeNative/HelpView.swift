@@ -54,12 +54,12 @@ struct HelpView: View {
       .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 220)
     } detail: {
       topicContent(selection ?? .overview)
+        .navigationTitle((selection ?? .overview).title)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appDetailBackground()
     }
     .navigationSplitViewStyle(.balanced)
     .appSplitWindowStyle()
-    .navigationTitle(AppLocalization.string("MacScope Help", language: settings.language))
   }
 
   @ViewBuilder
@@ -68,7 +68,6 @@ struct HelpView: View {
       projectPage
     } else {
       HelpTopicPage(
-        title: topic.title,
         subtitle: subtitle(for: topic),
         items: items(for: topic),
         action: topic == .permissions ? AnyView(permissionAction) : nil
@@ -77,27 +76,30 @@ struct HelpView: View {
   }
 
   private var projectPage: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        AppIconImage()
-          .frame(width: 72, height: 72)
-        Text("MacScope")
-          .font(.title2.weight(.semibold))
-        Text("MacScope is open source. Visit the repository for source code, releases, and issue tracking.")
-          .font(.body)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-        Text("github.com/shenmuoso/mac-scope")
-          .font(.callout.monospaced())
-          .textSelection(.enabled)
-        Link(destination: AppLinks.github) {
-          GitHubLinkLabel(title: "View Project on GitHub")
+    Form {
+      Section {
+        VStack(alignment: .leading, spacing: 18) {
+          AppIconImage()
+            .frame(width: 72, height: 72)
+          Text("MacScope")
+            .font(.title2.weight(.semibold))
+          Text("MacScope is open source. Visit the repository for source code, releases, and issue tracking.")
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+          Text("github.com/shenmuoso/mac-scope")
+            .font(.callout.monospaced())
+            .textSelection(.enabled)
+          Link(destination: AppLinks.github) {
+            GitHubLinkLabel(title: "View Project on GitHub")
+          }
+          .buttonStyle(.borderedProminent)
         }
-        .buttonStyle(.borderedProminent)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
       }
-      .frame(maxWidth: 620, alignment: .leading)
-      .padding(28)
     }
+    .formStyle(.grouped)
     .compactNativeScrollers()
   }
 
@@ -203,25 +205,20 @@ struct HelpView: View {
 }
 
 private struct HelpTopicPage: View {
-  let title: LocalizedStringKey
   let subtitle: LocalizedStringKey
   let items: [HelpItem]
   let action: AnyView?
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 0) {
-        Text(title)
-          .font(.title2.weight(.semibold))
+    Form {
+      Section {
         Text(subtitle)
           .font(.body)
           .foregroundStyle(.secondary)
-          .padding(.top, 4)
-          .padding(.bottom, 20)
-
-        Divider()
-
-        ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Section {
+        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
           HStack(alignment: .top, spacing: 12) {
             Image(systemName: item.systemImage)
               .font(.system(size: 16, weight: .medium))
@@ -236,23 +233,16 @@ private struct HelpTopicPage: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
           }
-          .padding(.vertical, 14)
-
-          if index < items.count - 1 {
-            Divider()
-              .padding(.leading, 36)
-          }
-        }
-
-        if let action {
-          Divider()
-          action
-            .padding(.top, 16)
+          .padding(.vertical, 6)
         }
       }
-      .frame(maxWidth: 620, alignment: .leading)
-      .padding(28)
+      if let action {
+        Section {
+          action
+        }
+      }
     }
+    .formStyle(.grouped)
     .compactNativeScrollers()
   }
 }

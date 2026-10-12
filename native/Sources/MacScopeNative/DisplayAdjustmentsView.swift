@@ -10,16 +10,9 @@ struct DisplayAdjustmentsView: View {
   private var colors: DisplayColorConfiguration? { store.colorConfigurations[display.id] }
 
   var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .top, spacing: 24) {
-        hardwareSection.frame(minWidth: 280, maxWidth: .infinity, alignment: .topLeading)
-        colorSection.frame(minWidth: 320, maxWidth: .infinity, alignment: .topLeading)
-      }
-      VStack(alignment: .leading, spacing: 16) {
-        hardwareSection
-        Divider()
-        colorSection
-      }
+    Group {
+      hardwareSection
+      colorSection
     }
     .onChange(of: colors?.selectedID) { value in
       selectedProfile = value ?? DisplayColorProfiles.factoryID
@@ -28,20 +21,7 @@ struct DisplayAdjustmentsView: View {
   }
 
   private var hardwareSection: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack {
-        Label(display.isBuiltIn ? "Hardware Brightness" : "DDC Controls", systemImage: "sun.max")
-          .font(.headline)
-        Spacer()
-        if store.busyDisplays.contains(display.id) {
-          ProgressView().controlSize(.small)
-        }
-        Button { Task { await store.loadControls(display) } } label: {
-          Image(systemName: "arrow.clockwise")
-        }
-        .help("Refresh Display Controls")
-        .disabled(busy || store.isAdjusting(display))
-      }
+    Section {
       if let hardware = store.hardware[display.id] {
         if hardware.brightness != nil {
           DisplayPercentControl(
@@ -73,14 +53,24 @@ struct DisplayAdjustmentsView: View {
       } else {
         Text("Reading Display Controls").foregroundStyle(.secondary)
       }
+      HStack {
+        Spacer()
+        if store.busyDisplays.contains(display.id) {
+          ProgressView().controlSize(.small)
+        }
+        Button { Task { await store.loadControls(display) } } label: {
+          Label("Refresh Display Controls", systemImage: "arrow.clockwise")
+        }
+        .disabled(busy || store.isAdjusting(display))
+      }
+    } header: {
+      Text(display.isBuiltIn ? LocalizedStringKey("Hardware Brightness") : LocalizedStringKey("DDC Controls"))
     }
   }
 
   private var colorSection: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Label("Color Configuration", systemImage: "paintpalette").font(.headline)
+    Section("Color Configuration") {
       if let colors, colors.isAvailable {
-        Text("Color Profile").font(.caption).foregroundStyle(.secondary)
         Picker("Color Profile", selection: $selectedProfile) {
           Text("\(AppLocalization.string("System Default", language: settings.language)) · \(colors.factoryName)")
             .tag(DisplayColorProfiles.factoryID)
@@ -88,7 +78,6 @@ struct DisplayAdjustmentsView: View {
             Text(profile.name).tag(profile.id)
           }
         }
-        .labelsHidden()
         .pickerStyle(.menu)
         .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(busy)

@@ -9,28 +9,23 @@ struct PerformancePowerView: View {
   @State private var showsFanControlConfirmation = false
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: .performancePower)
-
-      ScrollView {
-        VStack(spacing: 16) {
-          statusMetrics
-          cpuPanel
-          if GPUMetricsReader.isSupported { gpuPanel }
-          powerPanel
-          thermalPanel
-          coolingPanel
-          if metrics.snapshot.cooling.state == .available || fanControl.state != .idle {
-            fanControlPanel
-          }
-        }
-        .frame(maxWidth: 900)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.bottom, 28)
+    Form {
+      Section {
+        statusMetrics
       }
-      .compactNativeScrollers()
+      cpuPanel
+      if GPUMetricsReader.isSupported { gpuPanel }
+      powerPanel
+      thermalPanel
+      coolingPanel
+      if metrics.snapshot.cooling.state == .available || fanControl.state != .idle {
+        fanControlPanel
+      }
     }
+    .formStyle(.grouped)
+    .frame(maxWidth: DetailLayout.readingWidth)
+    .frame(maxWidth: .infinity)
+    .compactNativeScrollers()
     .confirmationDialog(
       "Start Maximum Cooling?",
       isPresented: $showsFanControlConfirmation,
@@ -747,9 +742,7 @@ private struct PerformanceStatusMetric: View {
       }
     }
     .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
-    .padding(14)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .padding(.vertical, 8)
   }
 }
 
@@ -769,7 +762,12 @@ private struct PerformancePanel<Content: View>: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    Section {
+      VStack(alignment: .leading, spacing: 14) {
+        content
+      }
+      .padding(.vertical, 8)
+    } header: {
       HStack(alignment: .firstTextBaseline) {
         Text(title)
           .font(.headline)
@@ -778,12 +776,7 @@ private struct PerformancePanel<Content: View>: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-      content
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(18)
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
   }
 }
 

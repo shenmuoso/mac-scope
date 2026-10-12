@@ -14,21 +14,18 @@ struct ProcessInspectorView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      header
-      Divider()
-      ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-          activitySection
-          cpuChart
-          memoryChart
-          ioChart
-          generalSection
-        }
-        .padding(16)
+    Form {
+      Section {
+        header
       }
-      .compactNativeScrollers()
+      activitySection
+      cpuChart
+      memoryChart
+      ioChart
+      generalSection
     }
+    .formStyle(.grouped)
+    .compactNativeScrollers()
   }
 
   private var header: some View {
@@ -53,7 +50,7 @@ struct ProcessInspectorView: View {
       .buttonStyle(.plain)
       .help("Close Process Info")
     }
-    .padding(16)
+    .padding(.vertical, 4)
   }
 
   private var activitySection: some View {
@@ -64,10 +61,10 @@ struct ProcessInspectorView: View {
       LabeledContent("Memory") {
         Text(DisplayFormat.bytes(process.memoryBytes))
       }
-      LabeledContent("Disk read") {
+      LabeledContent("Disk Read") {
         Text(DisplayFormat.rate(process.diskReadRate))
       }
-      LabeledContent("Disk write") {
+      LabeledContent("Disk Write") {
         Text(DisplayFormat.rate(process.diskWriteRate))
       }
       LabeledContent("Download") {
@@ -193,8 +190,8 @@ struct ProcessInspectorView: View {
       LabeledContent("Parent PID", value: String(process.parentPID))
       LabeledContent("Threads", value: String(process.threadCount))
       LabeledContent("Runtime", value: DisplayFormat.duration(process.runtime))
-      LabeledContent("Disk read total", value: DisplayFormat.bytes(process.diskReadTotal))
-      LabeledContent("Disk write total", value: DisplayFormat.bytes(process.diskWriteTotal))
+      LabeledContent("Disk Read Total", value: DisplayFormat.bytes(process.diskReadTotal))
+      LabeledContent("Disk Write Total", value: DisplayFormat.bytes(process.diskWriteTotal))
       LabeledContent("Downloaded", value: DisplayFormat.bytes(process.networkDownloadTotal))
       LabeledContent("Uploaded", value: DisplayFormat.bytes(process.networkUploadTotal))
       VStack(alignment: .leading, spacing: 4) {
@@ -243,9 +240,7 @@ private struct InspectorSection<Content: View>: View {
   @ViewBuilder let content: Content
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(title)
-        .font(.subheadline.weight(.semibold))
+    Section(title) {
       content
     }
   }
@@ -253,7 +248,7 @@ private struct InspectorSection<Content: View>: View {
 
 private struct ChartLegend: View {
   let color: Color
-  let title: String
+  let title: LocalizedStringKey
 
   var body: some View {
     HStack(spacing: 5) {

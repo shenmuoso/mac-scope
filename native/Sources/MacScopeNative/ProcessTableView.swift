@@ -376,8 +376,8 @@ final class ProcessTableScrollView: NSScrollView {
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
-    drawsBackground = true
-    backgroundColor = .controlBackgroundColor
+    drawsBackground = false
+    contentView.drawsBackground = false
     hasVerticalScroller = true
     hasHorizontalScroller = true
     autohidesScrollers = true
@@ -394,6 +394,7 @@ final class ProcessTableScrollView: NSScrollView {
     tableView.allowsEmptySelection = true
     tableView.selectionHighlightStyle = .regular
     tableView.usesAlternatingRowBackgroundColors = false
+    tableView.backgroundColor = .clear
     tableView.style = .fullWidth
     documentView = tableView
   }

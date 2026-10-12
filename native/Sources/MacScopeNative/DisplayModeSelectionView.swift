@@ -22,7 +22,6 @@ struct DisplayModeSelectionView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
         if pageCount > 1 {
-          Divider().frame(height: 16)
           pagination
         }
       }
@@ -74,10 +73,16 @@ struct DisplayModeSelectionView: View {
   }
 
   private var modeList: some View {
-    VStack(spacing: 1) {
-      ForEach(pageModes) { mode in modeRow(mode) }
+    VStack(alignment: .leading, spacing: 0) {
+      Picker("Matching Modes", selection: $selection) {
+        ForEach(pageModes) { mode in
+          modeRow(mode).tag(Optional(mode.id))
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.radioGroup)
       if modes.count > pageSize, pageModes.count < pageSize {
-        Color.clear.frame(height: CGFloat(pageSize - pageModes.count) * 43 - 1)
+        Color.clear.frame(height: CGFloat(pageSize - pageModes.count) * 42)
       }
     }
     .onMoveCommand { direction in
@@ -88,50 +93,36 @@ struct DisplayModeSelectionView: View {
       if direction == .down { selection = modes[min(index + 1, modes.count - 1)].id }
       if direction == .up { selection = modes[max(index - 1, 0)].id }
     }
-    .background(Color(nsColor: .controlBackgroundColor))
-    .clipShape(RoundedRectangle(cornerRadius: 6))
-    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.secondary.opacity(0.15)))
     .accessibilityLabel("Matching Modes")
   }
 
   private func modeRow(_ mode: DisplayModeSummary) -> some View {
-    let selected = selection == mode.id
-    return Button { selection = mode.id } label: {
-      HStack(spacing: 10) {
-        Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-          .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-          .frame(width: 16)
-        Text(mode.resolutionLabel)
-          .font(.body.weight(.medium))
-          .monospacedDigit()
-          .frame(width: 120, alignment: .leading)
-        HStack(spacing: 6) {
-          badge(mode.isHiDPI ? "HiDPI" : "1×")
-            .help(mode.isHiDPI ? "HiDPI" : "Standard")
-          badge(mode.aspectRatioLabel(isBuiltIn: display.isBuiltIn))
-          if mode.refreshKind == .proMotion {
-            badge("ProMotion", accent: true)
-          } else {
-            if mode.refreshKind == .variable { badge("VRR", accent: true) }
-            badge(mode.frequencyLabel)
-          }
+    HStack(spacing: 10) {
+      Text(mode.resolutionLabel)
+        .font(.body.weight(.medium))
+        .monospacedDigit()
+        .frame(width: 120, alignment: .leading)
+      HStack(spacing: 6) {
+        badge(mode.isHiDPI ? "HiDPI" : "1×")
+          .help(mode.isHiDPI ? "HiDPI" : "Standard")
+        badge(mode.aspectRatioLabel(isBuiltIn: display.isBuiltIn))
+        if mode.refreshKind == .proMotion {
+          badge("ProMotion", accent: true)
+        } else {
+          if mode.refreshKind == .variable { badge("VRR", accent: true) }
+          badge(mode.frequencyLabel)
         }
-        Spacer(minLength: 0)
-        Image(systemName: "checkmark")
-          .foregroundStyle(.tint)
-          .opacity(mode.isCurrent ? 1 : 0)
-          .frame(width: 16)
-          .help(mode.isCurrent ? "Current" : "")
       }
-      .padding(.horizontal, 10)
-      .frame(height: 42)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(selected ? Color.accentColor.opacity(0.12) : Color.clear)
-      .contentShape(Rectangle())
+      Spacer(minLength: 0)
+      Image(systemName: "checkmark")
+        .foregroundStyle(.tint)
+        .opacity(mode.isCurrent ? 1 : 0)
+        .frame(width: 16)
+        .help(mode.isCurrent ? "Current" : "")
     }
-    .buttonStyle(.plain)
+    .frame(height: 42)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .help("\(AppLocalization.string("Pixel Resolution", language: settings.language)): \(mode.pixelResolutionLabel)")
-    .accessibilityAddTraits(selected ? .isSelected : [])
     .accessibilityValue(mode.isCurrent ? Text("Current") : Text(""))
   }
 

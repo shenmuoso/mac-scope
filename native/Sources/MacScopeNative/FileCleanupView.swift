@@ -26,24 +26,22 @@ struct FileCleanupView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      SystemToolPageHeader(destination: isDuplicateMode ? .duplicates : .largeFiles)
-
+    DetailWorkspace {
       if items.isEmpty, store.activity?.tool == tool {
         MaintenanceActivityProminentView(tool: tool)
       } else {
         if store.activity?.tool == tool {
           MaintenanceActivityInlineView(tool: tool)
-          Divider()
+          DetailDivider()
         }
 
         if items.isEmpty {
           emptyState
         } else {
           selectionBar
-          Divider()
+          DetailDivider()
           fileTable
-          Divider()
+          DetailDivider()
           SystemToolStatusBar(
             summary: localized(
               "%lld selected · %@",
@@ -182,7 +180,8 @@ struct FileCleanupView: View {
       }
       .width(min: 220, ideal: 380)
     }
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   private var largeFileTable: some View {
@@ -225,7 +224,8 @@ struct FileCleanupView: View {
       }
       .width(min: 260, ideal: 440)
     }
-    .compactNativeScrollers()
+    .scrollContentBackground(.hidden)
+    .compactNativeScrollers(clearsBackground: true)
   }
 
   private var totalSize: UInt64 {
