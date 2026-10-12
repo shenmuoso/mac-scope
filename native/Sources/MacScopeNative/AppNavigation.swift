@@ -8,6 +8,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   case performancePower
   case processes
   case systemInfo
+  case displays
   case battery
   case ports
   case startupItems
@@ -26,6 +27,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     case .performancePower: "Performance & Power"
     case .processes: "Process Management"
     case .systemInfo: "System Information"
+    case .displays: "Displays"
     case .battery: "Battery Health"
     case .ports: "Ports"
     case .startupItems: "Startup Items"
@@ -52,6 +54,8 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
       "Inspect, group, and manage running processes and software."
     case .systemInfo:
       "Hardware, storage, displays, and connected devices on this Mac."
+    case .displays:
+      "Inspect display modes, refresh rates, and color configuration."
     case .battery:
       "Charge, capacity, cycle count, temperature, and electrical condition."
     case .ports:
@@ -79,6 +83,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     case .performancePower: "bolt.circle"
     case .processes: "list.bullet.rectangle"
     case .systemInfo: "desktopcomputer"
+    case .displays: "display.2"
     case .battery: "battery.100percent"
     case .ports: "network"
     case .startupItems: "power"
@@ -103,6 +108,8 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
       Color(nsColor: .systemGray)
     case .battery, .memory:
       Color(nsColor: .systemGreen)
+    case .displays:
+      Color(nsColor: .systemBlue)
     case .ports:
       Color(nsColor: .systemBlue)
     case .startupItems:

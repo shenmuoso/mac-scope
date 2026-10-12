@@ -27,6 +27,7 @@ struct MacScopeRootView: View {
           }
           Section("Hardware") {
             sidebarRow(.systemInfo)
+            sidebarRow(.displays)
             sidebarRow(.battery)
           }
           Section("System Tools") {
@@ -148,6 +149,8 @@ struct MacScopeRootView: View {
       ProcessManagementView()
     case .systemInfo:
       HardwareInfoView()
+    case .displays:
+      DisplayControlView()
     case .battery:
       BatteryHealthView()
     case .ports:
