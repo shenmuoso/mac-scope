@@ -9,6 +9,9 @@ final class DisplaySystemInterfaces {
   typealias ModeQuery = @convention(c) (UInt32, Int32) -> Bool
   typealias LegacyModes = @convention(c) (UInt32) -> Unmanaged<CFArray>?
   typealias DisplayInfo = @convention(c) (UInt32) -> Unmanaged<CFDictionary>?
+  typealias ModeCount = @convention(c) (UInt32, UnsafeMutablePointer<Int32>) -> Int32
+  typealias ModeDescription = @convention(c) (UInt32, Int32, UnsafeMutableRawPointer, Int32) -> Int32
+  typealias ConfigureMode = @convention(c) (CGDisplayConfigRef, UInt32, Int32) -> Int32
   typealias GetBrightness = @convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32
   typealias SetBrightness = @convention(c) (UInt32, Float) -> Int32
   typealias CreateAVService = @convention(c) (CFAllocator?, io_service_t) -> Unmanaged<CFTypeRef>?
@@ -21,6 +24,10 @@ final class DisplaySystemInterfaces {
   private(set) var isVariableRefresh: ModeQuery?
   private(set) var legacyModes: LegacyModes?
   private(set) var displayInfo: DisplayInfo?
+  private var modeCount: ModeCount?
+  private var currentModeIndex: ModeCount?
+  private var modeDescription: ModeDescription?
+  private var configureMode: ConfigureMode?
   private(set) var getBrightness: GetBrightness?
   private(set) var setBrightness: SetBrightness?
   private(set) var createAVService: CreateAVService?
@@ -37,6 +44,10 @@ final class DisplaySystemInterfaces {
     isVariableRefresh = symbol(sky, "SLSIsDisplayModeVRR")
     legacyModes = symbol(cg, "CGDisplayAvailableModes")
     displayInfo = symbol(core, "CoreDisplay_DisplayCreateInfoDictionary")
+    modeCount = symbol(sky, "SLSGetNumberOfDisplayModes")
+    currentModeIndex = symbol(sky, "SLSGetCurrentDisplayMode")
+    modeDescription = symbol(sky, "SLSGetDisplayModeDescriptionOfLength")
+    configureMode = symbol(sky, "SLSConfigureDisplayMode")
     getBrightness = symbol(brightness, "DisplayServicesGetBrightness")
     setBrightness = symbol(brightness, "DisplayServicesSetBrightness")
     createAVService = symbol(io, "IOAVServiceCreateWithService")
@@ -59,6 +70,56 @@ final class DisplaySystemInterfaces {
 
   func info(_ displayID: UInt32) -> [String: Any] {
     displayInfo?(displayID)?.takeRetainedValue() as? [String: Any] ?? [:]
+  }
+
+  func nativeModes(_ displayID: UInt32) -> [DisplayNativeMode] {
+    guard let modeCount, let modeDescription, configureMode != nil else { return [] }
+    var count: Int32 = 0
+    guard modeCount(displayID, &count) == 0, count > 0, count <= 4096 else { return [] }
+    let buffer = UnsafeMutableRawPointer.allocate(byteCount: DisplayNativeMode.byteCount, alignment: 16)
+    defer { buffer.deallocate() }
+    return (0..<count).compactMap { index in
+      buffer.initializeMemory(as: UInt8.self, repeating: 0, count: DisplayNativeMode.byteCount)
+      guard modeDescription(displayID, index, buffer, Int32(DisplayNativeMode.byteCount)) == 0 else { return nil }
+      return DisplayNativeMode(index: index, data: Data(bytes: buffer, count: DisplayNativeMode.byteCount))
+    }
+  }
+
+  func nativeCurrentModeIndex(_ displayID: UInt32) -> Int32? {
+    var index: Int32 = -1
+    guard currentModeIndex?(displayID, &index) == 0, index >= 0 else { return nil }
+    return index
+  }
+
+  func nativeModeIndices(_ displayID: UInt32) -> [Int32: Int32] {
+    let records = legacyModes?(displayID)?.takeUnretainedValue() as? [[String: Any]] ?? []
+    var indices: [Int32: Int32] = [:]
+    for record in records {
+      guard let index = record["Mode"] as? NSNumber,
+        let ioID = record["IODisplayModeID"] as? NSNumber else { continue }
+      indices[ioID.int32Value] = index.int32Value
+    }
+    return indices
+  }
+
+  func refreshKind(_ displayID: UInt32, index: Int32) -> DisplayRefreshKind {
+    if isProMotion?(displayID, index) == true { return .proMotion }
+    if isVariableRefresh?(displayID, index) == true { return .variable }
+    return isVariableRefresh == nil ? .unknown : .fixed
+  }
+
+  func configureNativeMode(_ index: Int32, displayID: UInt32) -> CGError {
+    guard let configureMode else { return .notImplemented }
+    var configuration: CGDisplayConfigRef?
+    let begin = CGBeginDisplayConfiguration(&configuration)
+    guard begin == .success, let configuration else { return begin == .success ? .failure : begin }
+    // SkyLight requires a real configuration token, never a connection ID.
+    let result = CGError(rawValue: configureMode(configuration, displayID, index)) ?? .failure
+    guard result == .success else {
+      CGCancelDisplayConfiguration(configuration)
+      return result
+    }
+    return CGCompleteDisplayConfiguration(configuration, .forSession)
   }
 
   func refreshKinds(_ displayID: UInt32) -> [Int32: DisplayRefreshKind] {

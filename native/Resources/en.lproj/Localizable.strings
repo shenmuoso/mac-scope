@@ -750,6 +750,7 @@
 "Select a system mode to change resolution or refresh rate." = "Select a system mode to change resolution or refresh rate.";
 "Apply Mode" = "Apply Mode";
 "Confirm Display Mode" = "Confirm Display Mode";
+"Changing Display Mode" = "Changing Display Mode";
 "The display is using %@ at %@. Keep this mode if the screen looks correct." = "The display is using %@ at %@. Keep this mode if the screen looks correct.";
 "Restoring previous mode in %llds" = "Restoring previous mode in %llds";
 "Restore" = "Restore";
@@ -757,6 +758,8 @@
 "The current display mode could not be identified." = "The current display mode could not be identified.";
 "The selected display mode is no longer available." = "The selected display mode is no longer available.";
 "macOS rejected this display mode." = "macOS rejected this display mode.";
+"macOS did not confirm the display mode change." = "macOS did not confirm the display mode change.";
+"The previous mode could not be restored. You can retry or keep the current mode." = "The previous mode could not be restored. You can retry or keep the current mode.";
 "Unable to Change Display Mode" = "Unable to Change Display Mode";
 "%lld matching modes" = "%lld matching modes";
 "Reset Mode Filters" = "Reset Mode Filters";

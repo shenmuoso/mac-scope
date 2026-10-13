@@ -12,6 +12,22 @@ struct DisplayModeSummary: Identifiable, Hashable, Sendable {
   let refreshKind: DisplayRefreshKind
   let isHiDPI: Bool
   let isCurrent: Bool
+  var isRefreshRateTruncated = false
+
+  func matches(_ other: DisplayModeSummary) -> Bool {
+    guard width == other.width, height == other.height,
+      pixelWidth == other.pixelWidth, pixelHeight == other.pixelHeight,
+      isHiDPI == other.isHiDPI,
+      refreshKind == other.refreshKind || refreshKind == .unknown || other.refreshKind == .unknown,
+      refreshRate.isFinite, other.refreshRate.isFinite else { return false }
+    // SkyLight's legacy descriptor truncates Hz to an integer. Preserve the
+    // precise CoreGraphics rate whenever one is available, without dropping
+    // the hidden native mode solely because its descriptor has less precision.
+    if isRefreshRateTruncated || other.isRefreshRateTruncated {
+      return floor(refreshRate) == floor(other.refreshRate)
+    }
+    return abs(refreshRate - other.refreshRate) < 0.02
+  }
 
   var resolutionLabel: String {
     "\(width) × \(height)"
@@ -92,9 +108,11 @@ struct DisplaySummary: Identifiable, Hashable, Sendable {
 struct DisplayModeChange: Identifiable, Sendable {
   let id: UUID
   let displayID: UInt32
-  let previousModeID: String
-  let appliedModeID: String
+  let identity: String
+  let previousMode: DisplayModeSummary
+  let appliedMode: DisplayModeSummary
   var secondsRemaining: Int
+  var restoreFailed = false
 }
 
 struct DisplayAdjustmentKey: Hashable {
@@ -108,6 +126,7 @@ final class DisplayControlStore: ObservableObject {
   @Published private(set) var isLoading = false
   @Published private(set) var errorMessage = ""
   @Published private(set) var pendingChange: DisplayModeChange?
+  @Published private(set) var isChangingMode = false
   @Published var operationError: String?
   @Published private(set) var hardware: [String: DisplayHardwareSnapshot] = [:]
   @Published private(set) var colorConfigurations: [String: DisplayColorConfiguration] = [:]
@@ -117,17 +136,25 @@ final class DisplayControlStore: ObservableObject {
   @Published private(set) var revision = 0
 
   private var rollbackTask: Task<Void, Never>?
-  private var previousSystemMode: CGDisplayMode?
-  private var pendingIdentity: String?
-  private let system = DisplaySystemInterfaces()
+  private var modeTask: Task<Void, Never>?
+  private var isRestoringMode = false
+  private var restoreAfterApply = false
+  private let modeControl: DisplayModeControl
+  private let confirmationSeconds: Int
   private let hardwareControl: any DisplayHardwareControlling
   private var adjustmentTasks: [DisplayAdjustmentKey: Task<Void, Never>] = [:]
   private var pendingAdjustments: [DisplayAdjustmentKey: Double] = [:]
   private var hardwareRevisions: [String: Int] = [:]
 
-  init(displays: [DisplaySummary] = [], hardwareControl: any DisplayHardwareControlling = DisplayHardwareControl()) {
+  init(
+    displays: [DisplaySummary] = [],
+    hardwareControl: any DisplayHardwareControlling = DisplayHardwareControl(),
+    modeControl: DisplayModeControl = DisplayModeControl(), confirmationSeconds: Int = 15
+  ) {
     self.displays = displays
     self.hardwareControl = hardwareControl
+    self.modeControl = modeControl
+    self.confirmationSeconds = max(1, confirmationSeconds)
   }
 
   func isAdjusting(_ display: DisplaySummary) -> Bool {
@@ -168,39 +195,12 @@ final class DisplayControlStore: ObservableObject {
 
     let summaries = ids.prefix(Int(count)).compactMap { displayID -> DisplaySummary? in
       let screen = screensByID[displayID]
-      guard let identity = DisplayColorProfiles.identity(displayID) else { return nil }
-      let current = CGDisplayCopyDisplayMode(displayID)
-      let currentKey = current.map(Self.modeKey)
+      guard let identity = modeControl.identity(displayID) else { return nil }
       let screenColorSpace = screen?.colorSpace
       let colorSpace = screenColorSpace.map {
         "\($0.numberOfColorComponents)-component"
       } ?? "Unavailable"
-      let options = [kCGDisplayShowDuplicateLowResolutionModes: true] as CFDictionary
-      var rawModes = (CGDisplayCopyAllDisplayModes(displayID, options) as? [CGDisplayMode] ?? [])
-      if let current, !rawModes.contains(where: { Self.modeKey($0) == currentKey }) {
-        rawModes.append(current)
-      }
-      let refreshKinds = system.refreshKinds(displayID)
-      let modes = rawModes.map { mode in
-          DisplayModeSummary(
-            id: Self.modeKey(mode),
-            width: mode.width,
-            height: mode.height,
-            pixelWidth: mode.pixelWidth,
-            pixelHeight: mode.pixelHeight,
-            refreshRate: mode.refreshRate,
-            refreshKind: refreshKinds[mode.ioDisplayModeID] ?? .unknown,
-            isHiDPI: mode.pixelWidth > mode.width || mode.pixelHeight > mode.height,
-            isCurrent: currentKey == Self.modeKey(mode)
-          )
-        }
-        .sorted {
-          if $0.isCurrent != $1.isCurrent { return $0.isCurrent }
-          if $0.width != $1.width { return $0.width > $1.width }
-          if $0.height != $1.height { return $0.height > $1.height }
-          if $0.refreshRate != $1.refreshRate { return $0.refreshRate > $1.refreshRate }
-          return $0.pixelWidth > $1.pixelWidth
-        }
+      let modes = modeControl.modes(displayID)
 
       let currentSummary = modes.first(where: \.isCurrent)
       let bounds = CGDisplayBounds(displayID)
@@ -223,39 +223,61 @@ final class DisplayControlStore: ObservableObject {
     return (summaries, "")
   }
 
-  func apply(modeID: String, to display: DisplaySummary) {
-    guard pendingChange == nil, !busyDisplays.contains(display.id), !isAdjusting(display) else { return }
-    guard DisplayColorProfiles.identity(display.displayID) == display.identity,
-      let previousMode = CGDisplayCopyDisplayMode(display.displayID) else {
+  @discardableResult
+  func apply(modeID: String, to display: DisplaySummary) -> Task<Void, Never>? {
+    guard pendingChange == nil, !isChangingMode,
+      !busyDisplays.contains(display.id), !isAdjusting(display) else { return nil }
+    guard modeControl.identity(display.displayID) == display.identity,
+      let previousMode = modeControl.currentMode(display.displayID) else {
       operationError = "The current display mode could not be identified."
-      return
+      return nil
     }
-    guard Self.modeKey(previousMode) != modeID else { return }
-    guard let targetMode = Self.systemMode(displayID: display.displayID, id: modeID) else {
+    guard previousMode.id != modeID else { return nil }
+    guard let targetMode = display.modes.first(where: { $0.id == modeID }) else {
       operationError = "The selected display mode is no longer available."
       refresh()
-      return
-    }
-
-    let result = CGDisplaySetDisplayMode(display.displayID, targetMode, nil)
-    guard result == .success else {
-      operationError = "macOS rejected this display mode."
-      return
+      return nil
     }
 
     let change = DisplayModeChange(
       id: UUID(),
       displayID: display.displayID,
-      previousModeID: Self.modeKey(previousMode),
-      appliedModeID: modeID,
-      secondsRemaining: 15
+      identity: display.identity, previousMode: previousMode, appliedMode: targetMode,
+      secondsRemaining: confirmationSeconds
     )
     pendingChange = change
-    previousSystemMode = previousMode
-    pendingIdentity = display.identity
+    operationError = nil
+    isChangingMode = true
+    restoreAfterApply = false
+    let task = Task { [weak self] in
+      guard let self else { return }
+      do {
+        try await self.modeControl.setMode(targetMode, displayID: display.displayID, identity: display.identity)
+        self.isChangingMode = false
+        if self.restoreAfterApply {
+          await self.restorePendingChange()?.value
+        } else {
+          self.startRollbackCountdown(change)
+        }
+      } catch {
+        self.isChangingMode = false
+        self.operationError = error.localizedDescription
+        if self.modeControl.currentMode(display.displayID)?.matches(previousMode) == true {
+          self.clearPendingChange()
+        } else {
+          await self.restorePendingChange()?.value
+        }
+      }
+      self.refresh()
+    }
+    modeTask = task
+    return task
+  }
+
+  private func startRollbackCountdown(_ change: DisplayModeChange) {
     rollbackTask?.cancel()
     rollbackTask = Task { [weak self] in
-      for remaining in stride(from: 14, through: 0, by: -1) {
+      for remaining in stride(from: change.secondsRemaining - 1, through: 0, by: -1) {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         guard !Task.isCancelled else { return }
         guard let self, self.pendingChange?.id == change.id else { return }
@@ -266,33 +288,50 @@ final class DisplayControlStore: ObservableObject {
         self.pendingChange?.secondsRemaining = remaining
       }
     }
-    refresh()
   }
 
   func confirmPendingChange() {
-    rollbackTask?.cancel()
-    rollbackTask = nil
-    pendingChange = nil
-    previousSystemMode = nil
-    pendingIdentity = nil
+    guard !isChangingMode else { return }
+    clearPendingChange()
     refresh()
   }
 
-  func restorePendingChange() {
-    guard let change = pendingChange else { return }
+  private func clearPendingChange() {
     rollbackTask?.cancel()
     rollbackTask = nil
-
-    if DisplayColorProfiles.identity(change.displayID) == pendingIdentity,
-      let previousMode = previousSystemMode {
-      if CGDisplaySetDisplayMode(change.displayID, previousMode, nil) != .success {
-        operationError = "macOS could not restore the previous display mode."
-      }
-    }
     pendingChange = nil
-    previousSystemMode = nil
-    pendingIdentity = nil
-    refresh()
+    restoreAfterApply = false
+  }
+
+  @discardableResult
+  func restorePendingChange() -> Task<Void, Never>? {
+    guard let change = pendingChange else { return nil }
+    if isChangingMode {
+      if !isRestoringMode { restoreAfterApply = true }
+      return modeTask
+    }
+    rollbackTask?.cancel()
+    rollbackTask = nil
+    if operationError == "macOS could not restore the previous display mode." { operationError = nil }
+    pendingChange?.secondsRemaining = 0
+    pendingChange?.restoreFailed = false
+    isChangingMode = true
+    isRestoringMode = true
+    let task = Task { [weak self] in
+      guard let self else { return }
+      do {
+        try await self.modeControl.setMode(change.previousMode, displayID: change.displayID, identity: change.identity)
+        self.clearPendingChange()
+      } catch {
+        self.pendingChange?.restoreFailed = true
+        self.operationError = "macOS could not restore the previous display mode."
+      }
+      self.isRestoringMode = false
+      self.isChangingMode = false
+      self.refresh()
+    }
+    modeTask = task
+    return task
   }
 
   func loadControls(_ display: DisplaySummary) async {
@@ -388,19 +427,6 @@ final class DisplayControlStore: ObservableObject {
     colorConfigurations[display.id] = await hardwareControl.colorConfiguration(display.displayID)
   }
 
-  private static func systemMode(displayID: UInt32, id: String) -> CGDisplayMode? {
-    let options = [kCGDisplayShowDuplicateLowResolutionModes: true] as CFDictionary
-    return (CGDisplayCopyAllDisplayModes(displayID, options) as? [CGDisplayMode])?
-      .first { modeKey($0) == id }
-  }
-
-  private static func modeKey(_ mode: CGDisplayMode) -> String {
-    let refresh = Int((mode.refreshRate * 100).rounded())
-    // A display can expose duplicate geometry and refresh combinations with
-    // different I/O mode IDs (for example, different timing/color variants).
-    // Keep the system ID in the key so every mode remains selectable.
-    return "\(mode.ioDisplayModeID)-\(mode.width)-\(mode.height)-\(mode.pixelWidth)-\(mode.pixelHeight)-\(refresh)"
-  }
 }
 
 struct DisplayControlView: View {
@@ -535,11 +561,8 @@ struct DisplayControlView: View {
       .frame(maxWidth: .infinity)
       .compactNativeScrollers()
 
-      if let pendingChange = store.pendingChange,
-        let changedDisplay = store.displays.first(where: { $0.displayID == pendingChange.displayID }),
-        let appliedMode = changedDisplay.modes.first(where: { $0.id == pendingChange.appliedModeID })
-      {
-        modeChangeOverlay(appliedMode, secondsRemaining: pendingChange.secondsRemaining)
+      if let pendingChange = store.pendingChange {
+        modeChangeOverlay(pendingChange)
       }
     }
     .background(Color(nsColor: .windowBackgroundColor))
@@ -633,10 +656,7 @@ struct DisplayControlView: View {
     .disabled(store.pendingChange != nil)
   }
 
-  private func modeChangeOverlay(
-    _ mode: DisplayModeSummary,
-    secondsRemaining: Int
-  ) -> some View {
+  private func modeChangeOverlay(_ change: DisplayModeChange) -> some View {
     ZStack {
       Color.black.opacity(0.18)
         .ignoresSafeArea()
@@ -645,15 +665,29 @@ struct DisplayControlView: View {
         Label("Confirm Display Mode", systemImage: "rectangle.on.rectangle")
           .font(.headline)
 
-        Text(localized(
-          "The display is using %@ at %@. Keep this mode if the screen looks correct.",
-          mode.resolutionLabel,
-          mode.refreshLabel
-        ))
+        Group {
+          if store.isChangingMode {
+            Text("Changing Display Mode")
+          } else if change.restoreFailed {
+            Text("The previous mode could not be restored. You can retry or keep the current mode.")
+          } else {
+            Text(localized(
+              "The display is using %@ at %@. Keep this mode if the screen looks correct.",
+              change.appliedMode.resolutionLabel,
+              change.appliedMode.refreshLabel
+            ))
+          }
+        }
           .fixedSize(horizontal: false, vertical: true)
 
         HStack {
-          Text(localized("Restoring previous mode in %llds", Int64(secondsRemaining)))
+          Group {
+            if store.isChangingMode {
+              ProgressView().controlSize(.small)
+            } else if !change.restoreFailed {
+              Text(localized("Restoring previous mode in %llds", Int64(change.secondsRemaining)))
+            }
+          }
             .font(.caption)
             .foregroundStyle(.secondary)
             .monospacedDigit()
@@ -661,11 +695,14 @@ struct DisplayControlView: View {
           Button("Restore") {
             store.restorePendingChange()
           }
+          .fixedSize()
           Button("Keep Mode") {
             store.confirmPendingChange()
           }
           .buttonStyle(.borderedProminent)
+          .fixedSize()
         }
+        .disabled(store.isChangingMode)
       }
       .padding(20)
       .frame(maxWidth: 460)

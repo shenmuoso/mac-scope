@@ -757,6 +757,7 @@
 "Select a system mode to change resolution or refresh rate." = "选择系统模式以更改分辨率或刷新率。";
 "Apply Mode" = "应用模式";
 "Confirm Display Mode" = "确认显示模式";
+"Changing Display Mode" = "正在切换显示模式";
 "The display is using %@ at %@. Keep this mode if the screen looks correct." = "当前显示器正在使用 %@、%@。如果画面正常，请保留此模式。";
 "Restoring previous mode in %llds" = "将在 %lld 秒后恢复之前的模式";
 "Restore" = "恢复";
@@ -764,6 +765,8 @@
 "The current display mode could not be identified." = "无法识别当前显示模式。";
 "The selected display mode is no longer available." = "所选显示模式已不可用。";
 "macOS rejected this display mode." = "macOS 拒绝了这个显示模式。";
+"macOS did not confirm the display mode change." = "macOS 未能确认显示模式已切换。";
+"The previous mode could not be restored. You can retry or keep the current mode." = "未能恢复之前的模式。可以重试恢复，或保留当前模式。";
 "Unable to Change Display Mode" = "无法更改显示模式";
 "%lld matching modes" = "%lld 个匹配模式";
 "Reset Mode Filters" = "重置模式筛选";
