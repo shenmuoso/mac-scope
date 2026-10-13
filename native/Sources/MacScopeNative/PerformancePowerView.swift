@@ -18,7 +18,9 @@ struct PerformancePowerView: View {
       powerPanel
       thermalPanel
       coolingPanel
-      if metrics.snapshot.cooling.state == .available || fanControl.state != .idle {
+      if metrics.snapshot.cooling.state != .fanless,
+        metrics.snapshot.cooling.state == .available || fanControl.state != .idle
+      {
         fanControlPanel
       }
     }
