@@ -1,290 +1,300 @@
 <p align="center">
-  <img src="native/Resources/MacScopeIcon.png" width="128" alt="MacScope 图标">
+  <img src="native/Resources/MacScopeIcon.png" width="128" alt="MacScope icon">
 </p>
 
 <h1 align="center">MacScope</h1>
 
 <p align="center">
-  <strong>为 macOS 独占打造的轻量系统监控与维护工具</strong>
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>
 </p>
 
 <p align="center">
-  看清资源占用，管理活跃进程，释放磁盘空间，干净卸载应用。
+  <strong>A lightweight system monitor and maintenance app built exclusively for macOS</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/shenmuoso/mac-scope/releases"><strong>下载最新版</strong></a>
+  Understand resource usage, manage processes, reclaim disk space, and uninstall apps thoroughly.
+</p>
+
+<p align="center">
+  <a href="https://github.com/shenmuoso/mac-scope/releases"><strong>Download the latest release</strong></a>
   ·
-  <a href="#核心功能">功能介绍</a>
+  <a href="#features">Features</a>
   ·
-  <a href="https://github.com/shenmuoso/mac-scope/issues">反馈问题</a>
+  <a href="https://github.com/shenmuoso/mac-scope/issues">Report an issue</a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.4.13-1677ff" alt="Version 0.4.13">
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI%20%2B%20AppKit-Native-f05138?logo=swift" alt="SwiftUI and AppKit">
-  <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="English and Simplified Chinese">
+  <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="App languages: English and Simplified Chinese">
 </p>
 
 > [!TIP]
-> **0.4.13 统一详情页的原生分组界面。** 信息、显示器、电池、性能和内存页面采用系统分组表单；表格工具集中呈现筛选、结果和操作。保留原生控件、系统深浅色外观与键盘交互。
+> **0.4.13: native grouped views and display control.** System information, displays, battery, performance, and memory use native grouped forms. Change resolution, HiDPI, and refresh rate, and adjust brightness, contrast, volume, and ICC profiles on supported hardware.
 
-MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界面中。它由 SwiftUI 与 AppKit 构建，不包含 Electron、内置浏览器或额外运行时；无需终端、Python 和 Homebrew，安装后即可使用。
+MacScope brings your Mac's essential information together in a clear, native interface. Built with SwiftUI and AppKit, it includes no Electron, embedded browser, or additional runtime. No Terminal, Python, or Homebrew is needed to use the app.
 
-![MacScope 0.4.12 系统概览](.github/assets/macscope-preview.png)
+![MacScope 0.4.13 in light mode: live system overview](.github/assets/macscope-overview.png)
 
-## 为什么选择 MacScope
+![MacScope 0.4.13 in dark mode: display control and HiDPI modes](.github/assets/macscope-displays.png)
 
-| | 你得到的体验 |
+## Why MacScope
+
+| | What you get |
 | --- | --- |
-| **真正原生** | 标准 macOS 窗口、菜单、表格、设置、授权对话框与深浅色外观 |
-| **轻量直接** | 小体积、无额外运行时，不用为了看资源占用再运行一个沉重的网页容器 |
-| **信息集中** | CPU、功耗、温度、风扇、内存、磁盘、网络、进程和维护工具都在同一个应用里 |
-| **操作透明** | 扫描结果、文件路径、处理进度和失败原因都清晰可见，删除前由你决定 |
-| **本地优先** | 监控与文件分析均在本机完成，不上传系统状态和扫描结果 |
+| **Native throughout** | Standard macOS windows, menus, tables, settings, authorization dialogs, and light and dark appearances |
+| **Lightweight** | A small app with no extra runtime or heavyweight web container |
+| **Everything together** | CPU, power, temperature, fans, memory, disks, network, processes, and maintenance tools in one app |
+| **Transparent actions** | Clear scan results, file paths, progress, and failure reasons; you choose what to delete |
+| **Local first** | Monitoring and file analysis run on your Mac; system data and scan results are not uploaded |
 
-## 核心功能
+<a id="features"></a>
 
-### 原生菜单栏监控
+## Features
 
-不必一直把窗口放在桌面上。MacScope 可以常驻菜单栏，用最短的视线距离告诉你 Mac 当前是否繁忙。
+### Native menu bar monitoring
 
-- 只显示黑白剪影图标，或紧凑显示最多三个实时指标。
-- 自由选择 CPU、GPU（M 系列）、内存、磁盘、网络、温度、整机功耗和充电功率，并调整显示顺序；GPU 与功耗指标默认关闭。
-- 网络上传与下载速率分两行显示，各指标使用固定宽度，数值变化不会挤动菜单栏中的其他图标。
-- 点击图标展开看板，查看各项指标最近 1 分钟的变化。
-- 查看按 CPU、内存、磁盘或网络排序的 Top 进程。
-- 自定义看板模块与进程数量；关闭主窗口后仍可继续监控。
-- 看板默认采用克制的单色样式，也可以开启“彩色模式”，仅对图表和动态状态使用颜色。
-- 鼠标进入看板后离开约 0.25 秒自动关闭，可在“设置 > 菜单栏”中关闭此行为。
-- 主窗口、设置和帮助均采用左侧连续透明材质、右侧统一实色背景，标题栏与各自区域保持一致。macOS 26+ 的侧栏、菜单栏面板和结果弹窗使用原生 Liquid Glass，并按外观调整阅读底色以保证文字清晰。在“设置 > 外观 > Liquid Glass”中选择“玻璃、均衡、磨砂”，即时生效并自动保存。
-- 右侧使用原生标题栏和灰底功能分组：信息页面优先采用 SwiftUI 分组表单，表格工作区统一留白与状态栏，减少跨区域分隔线及描边。
-- 较旧系统使用原生模糊材质，所有材质遵循系统的降低透明度与增强对比度设置。
-- 可在“设置 > 外观”隐藏程序坞图标。隐藏后仍可从菜单栏打开窗口与设置，但不会出现在应用切换器中；至少保留程序坞或菜单栏中的一个入口。
-- 程序坞图标默认跟随应用外观；窗口外观设为“跟随系统”时，图标也随系统深浅色切换。可在“设置 > 外观 > 程序坞图标”单独选择浅色或深色，立即生效。Finder 中的图标外观由 macOS 的图标样式设置控制。
+Keep an eye on your Mac without keeping the main window open.
 
-### 实时资源监控
+- Show only a monochrome icon, or display up to three compact live metrics.
+- Choose CPU, GPU (Apple Silicon), memory, disk, network, temperature, system power, and charging power, and arrange their order. GPU and power metrics are off by default.
+- Upload and download rates appear on separate lines. Fixed metric widths prevent changing values from shifting other menu bar icons.
+- Click the icon to view the last minute of activity in the dashboard.
+- View top processes sorted by CPU, memory, disk, or network usage.
+- Customize dashboard modules and process counts; monitoring continues after the main window closes.
+- The dashboard is monochrome by default. Optional Color Mode adds color to charts and live status indicators.
+- After the pointer enters the dashboard, leaving it closes the panel after about 0.25 seconds. Turn this off in Settings > Menu Bar.
+- Main, settings, and help windows share a continuous translucent sidebar and a solid content background. On macOS 26+, sidebars, the menu bar dashboard, and result dialogs use native Liquid Glass with appearance-aware backgrounds. Choose Glass, Balanced, or Frosted in Settings > Appearance > Liquid Glass; changes apply immediately and are saved automatically.
+- Native title bars and gray grouped sections organize detail pages. Information views use SwiftUI grouped forms, while table workspaces share consistent spacing and status bars with fewer borders and dividers.
+- Earlier macOS versions use native blur materials. All materials respect Reduce Transparency and Increase Contrast.
+- Hide the Dock icon in Settings > Appearance. Windows and settings remain accessible from the menu bar, but the app leaves the app switcher. At least one of the Dock or menu bar entries must remain enabled.
+- The Dock icon follows the app's appearance by default, including system changes when using Follow System. Override it with Light or Dark in Settings > Appearance > Dock Icon. Finder icon appearance is controlled by macOS icon style settings.
 
-当风扇突然加速、机器发热或网络变慢时，不再靠猜。
+### Live resource monitoring
 
-- **CPU：** 总占用、用户占用、系统占用与 SoC 温度。
-- **GPU（仅 M 系列）：** 总占用与最近 60 秒趋势；系统提供数据时可查看渲染和分块占用，无需管理员权限。
-- **内存：** 已用、总量、可用量与实时占用比例。
-- **磁盘：** 数据卷容量、读取速率和写入速率。
-- **网络：** 实时下载与上传速率。
-- **重新设计的概览：** 左侧环形指标集中显示当前状态，右侧合并曲线对比最近 60 秒的系统负载、磁盘和网络活动。
-- **动态状态色：** 根据占用率、网速和温度区间快速识别当前状态。
-- **灵活刷新：** 支持暂停、立即刷新，以及 `0.5`、`1`、`2`、`5` 秒刷新频率。
+Find out what is happening when your Mac gets hot, fans speed up, or the network slows down.
 
-### 性能、功耗与散热
+- **CPU:** total, user, and system usage, plus SoC temperature.
+- **GPU (Apple Silicon only):** total usage and 60-second history; renderer and tiler usage when available, without administrator access.
+- **Memory:** used, total, available, and live utilization.
+- **Disk:** data volume capacity, read rate, and write rate.
+- **Network:** live download and upload rates.
+- **Overview:** circular indicators show current values on the left; combined charts compare system load, disk, and network activity over the last 60 seconds on the right.
+- **Status colors:** quickly identify utilization, network speed, and temperature ranges.
+- **Refresh controls:** pause, refresh immediately, or choose `0.5`, `1`, `2`, or `5` second intervals.
 
-把高负载、异常发热和风扇加速放在同一个上下文中观察。
+### Performance, power, and cooling
 
-- 同时查看 CPU 与 GPU 占用、整机功耗、充电功率、适配器输入、SoC 温度和风扇转速。
-- 使用最近 60 秒趋势图分别呈现 CPU、GPU、功耗、温度和散热变化。
-- 列出每个可用风扇的当前、最低和最高转速；无风扇机型和系统未暴露数据时会显示明确状态。
-- 在能够读取并回验风扇目标值的机型上，可选择 15、30 或 60 分钟“最大散热”；启动时由 macOS 显示原生管理员授权框。
-- 最大散热只会把所有风扇联动提升到硬件报告的最高转速，不支持任意转速，也不会降低 macOS 当前选择的风扇速度。
-- 整机功耗和充电功率可以按需加入菜单栏紧凑指标与菜单栏看板，默认均不启用。
+Compare heavy workloads, temperature changes, and fan behavior in one place.
 
-### 进程监控与管理
+- View CPU and GPU usage, system power, charging power, adapter input, SoC temperature, and fan speed together.
+- Separate 60-second charts show CPU, GPU, power, temperature, and cooling trends.
+- Inspect each available fan's current, minimum, and maximum RPM. Fanless hardware and unavailable telemetry are identified explicitly.
+- Fan controls are hidden on Macs detected as fanless. Older Intel MacBook Air models with fans retain the controls.
+- On supported hardware with verifiable fan targets, enable Maximum Cooling for 15, 30, or 60 minutes through the native macOS administrator authorization dialog.
+- Maximum Cooling raises all fans together to their hardware-reported maximum. It does not provide arbitrary RPM control or lower the speed selected by macOS.
+- Add system power and charging power to compact menu bar metrics or the dashboard as needed; both are off by default.
 
-进程管理现在拥有独立页面，用一个表格看清是谁正在消耗你的 Mac，并直接采取行动。
+### Process monitoring and management
 
-- 集中查看进程名称、PID、CPU、内存、磁盘读写、网络上下行、线程数和运行时间。
-- 点击任意表头升序或降序排序，快速找到资源占用最高的进程；大批量进程排序会复用预计算值，避免点击内存等表头时界面卡死。
-- 区分系统软件或服务、已安装软件、插件或工具及其他来源，并支持来源筛选。
-- 按软件分类关联进程，汇总 CPU、内存、磁盘与网络占用，展开后可继续按表头排序子进程。
-- 按进程、软件名称、Bundle ID 或 PID 搜索，Top 行数可设置为 5、10、20 或 50。
-- 双击进程打开详情，查看最近 1 分钟的 CPU、内存与 I/O 趋势。
-- 支持正常退出与强制退出，并在执行前进行确认。
+A dedicated process table shows what is consuming resources and lets you take action.
 
-### 系统硬件与电池健康
+- View process names, PIDs, CPU, memory, disk I/O, network traffic, thread counts, and running time.
+- Click column headers to sort in either direction. Precomputed sort values keep large process lists responsive, including memory sorting.
+- Distinguish system software and services, installed apps, plug-ins and tools, and other sources; filter by source.
+- Group processes by app, compare aggregate CPU, memory, disk, and network usage, and sort child processes within expanded groups.
+- Search by process or app name, bundle ID, or PID; choose the top 5, 10, 20, or 50 entries.
+- Double-click a process to inspect its last minute of CPU, memory, and I/O activity.
+- Quit or force quit a process after confirmation.
 
-快速查看当前 Mac 的硬件、显示器和连接状态，不必在系统报告的层级中逐项查找。
+### Hardware information and battery health
 
-- 显示 Mac 型号、芯片、架构、CPU 核心、内存、系统版本、运行时间和热状态。
-- 列出内置与外接显示器的分辨率、像素分辨率和主显示器状态。
-- 查看 USB 设备、蓝牙控制器与已连接设备，以及 Wi-Fi 接口、信号、速率和信道。
-- MacBook 可查看当前电量、最大与设计容量、循环次数、电池状态、温度、电压和电流。
-- 不支持的硬件字段会保持不可用，不会用估算值冒充真实读数。
+Inspect hardware, displays, and connections without navigating multiple System Report sections.
 
-### 显示器控制
+- View Mac model, chip, architecture, CPU cores, memory, macOS version, uptime, and thermal state.
+- List built-in and external displays, logical and pixel resolutions, and main display status.
+- Inspect USB devices, Bluetooth controllers and connected devices, and Wi-Fi interfaces, signal strength, rates, and channels.
+- On MacBooks, view charge level, maximum and design capacity, cycle count, battery condition, temperature, voltage, and current.
+- Unsupported fields remain unavailable rather than showing estimated readings.
 
-- 在设备分组中切换显示器，页面使用一个原生分组表单滚动区域；当前模式、模式选择、硬件调节和颜色配置分别成组，筛选条件保持同一行，模式列表分页显示。
-- 按逻辑分辨率、HiDPI、刷新类型和频率组合筛选系统模式；结果逐行显示分辨率及缩放、宽高比、刷新率标签，内置刘海屏适配比例显示为 Notch，切换后提供 15 秒确认与自动恢复。
-- 依据系统模式信息区分 ProMotion、其他可变刷新率与固定刷新率；固定 120 Hz 不会标记为 ProMotion，59.94 Hz 等频率保留小数。
-- 控制内置屏原始背光，以及支持 DDC/CI 的外接屏亮度、对比度和音量；拖动立即更新百分比，后台合并写入并校验，失败时恢复已确认值。未收到有效回复的项目显示不可用。
-- 切换已安装的 RGB 显示器 ICC 描述文件，并可恢复当前显示器的系统默认描述文件。
-- ProMotion 识别、内置背光和 Apple Silicon DDC 使用运行时检测的非公开系统接口，可能受 macOS 更新影响。ICC 使用 ColorSync；Intel DDC 使用 IOKit I2C。显示器、连接线及转接器均可能影响 DDC 支持。
+### Display control
 
-### 端口与下载工具
+- Switch displays in the Hardware group. A single native grouped form organizes the current mode, mode selection, hardware adjustments, and color profiles. Filters stay on one row and modes use pagination.
+- Combine logical resolution, HiDPI, refresh type, and refresh rate filters. Rows show resolution, scaling, aspect ratio, and refresh labels; modes matching a built-in notched display are labeled Notch. A 15-second confirmation timer automatically restores the previous mode unless confirmed.
+- Include native HiDPI modes missing from the public mode list, even when starting at a lower resolution. Verify actual output after switching and retain the original mode for retry if restoration fails.
+- Distinguish ProMotion, other variable refresh modes, and fixed rates using system mode data. Fixed 120 Hz is not labeled ProMotion; fractional rates such as 59.94 Hz retain their precision.
+- Adjust raw built-in backlight and supported external displays' brightness, contrast, and volume through DDC/CI. Dragging updates percentages immediately; background writes are coalesced and verified. Failed adjustments revert to the confirmed value, and controls without valid replies remain unavailable.
+- Switch installed RGB display ICC profiles or restore the display's system default profile.
+- Complete mode enumeration and switching, ProMotion detection, built-in backlight, and Apple Silicon DDC use private system interfaces detected at runtime and may be affected by macOS updates. ICC uses ColorSync; Intel DDC uses IOKit I2C. Displays, cables, and adapters can affect DDC support.
 
-- **端口占用：** 查看当前 TCP 和 UDP 监听端口、地址、PID、进程与所属软件；支持筛选、复制、打开本机地址和结束进程。
-- **下载清理：** 分类扫描安装包、压缩包、重复下载、不完整下载、大文件和旧文件。
-- 重复下载通过内容哈希确认，并确保每组至少保留一份。
-- “推荐选择”只勾选不完整下载、较旧的安装包或压缩包，以及重复文件中的旧副本。
-- 下载文件始终经过用户确认后移到废纸篓，不会自动永久删除。
+### Ports and downloads
 
-### 启动项管理
+- **Ports:** inspect TCP and UDP listening ports, addresses, PIDs, processes, and owning apps. Filter, copy, open local addresses, or terminate processes.
+- **Downloads Cleanup:** categorize installers, archives, duplicate downloads, incomplete downloads, large files, and old files.
+- Content hashes verify duplicate downloads, and at least one copy per group is preserved.
+- Recommended Selection selects only incomplete downloads, older installers and archives, and older duplicate copies.
+- Downloads always move to Trash after confirmation; they are never automatically deleted permanently.
 
-把“登录时打开”、后台任务和已经失效的启动配置分开呈现，避免把“正在运行”和“允许启动”混为一谈。
+### Startup items
 
-- 读取 macOS 的“登录时打开”项目，并支持添加、移除和定位对应应用。
-- 扫描用户与第三方 `launchd` 后台任务，显示许可状态、运行状态、触发方式和所属软件。
-- 将目标丢失、配置异常或应用已经卸载的项目集中到“需要处理”，确认后再禁用或清除。
-- 对系统项目、共享配置和关联证据不足的项目保持保守，不会默认删除。
+Separate Open at Login items, background tasks, and stale startup configurations without confusing running status with startup permission.
 
-### 垃圾扫描与清理
+- Read macOS Open at Login items, and add, remove, or locate their apps.
+- Scan user and third-party `launchd` tasks, showing permission, running state, triggers, and owning apps.
+- Review missing targets, invalid configurations, and entries left by removed apps in Needs Attention before disabling or removing them.
+- System items, shared configurations, and uncertain associations are handled conservatively and are not selected for deletion by default.
 
-清理不是一个模糊的“立即加速”按钮。MacScope 会先告诉你找到了什么，再由你决定删除什么。
+### Junk scanning and cleanup
 
-- 扫描用户缓存、日志、诊断报告和开发者文件。
-- 按类别查看大小、路径和具体项目，并支持逐项选择。
-- 清理时显示当前文件与总体进度；完成后以紧凑摘要呈现结果，逐项状态、路径和失败原因可在独立结果窗口中查看。
-- 缓存可设置为移到废纸篓或永久删除，默认采用更稳妥的废纸篓模式。
-- 无法处理的项目保留明确原因，解决权限问题后可以重试。
+See what was found before deciding what to remove.
 
-### 应用卸载与残留清除
+- Scan user caches, logs, diagnostic reports, and developer files.
+- Inspect sizes, paths, and individual items by category, and select items separately.
+- Watch the current file and overall progress during cleanup. A compact summary shows completion; a separate results window lists each item's status, path, and failure reason.
+- Move caches to Trash or delete them permanently. Trash is the default.
+- Failed items retain clear explanations and can be retried after resolving permission issues.
 
-卸载应用不应只把一个图标拖走。MacScope 将应用本体与相关数据放在同一个确认流程中处理。
+### App uninstallation and leftovers
 
-- 扫描标准应用目录并显示应用状态、位置和大小。
-- 识别 Bundle ID、相关数据以及系统中已注册的其他应用副本。
-- 分析与应用关联的登录项、启动代理和后台配置，并区分确定关联、可能关联及共享项目。
-- 在独立确认界面中检查应用本体、每一项残留文件和可安全移除的启动配置。
-- 显示卸载路径与实时进度；完成后的成功结果、失败原因和权限处理入口集中在独立结果窗口中。
-- 卸载 `/Applications` 中的受保护应用时，确认后立即显示 macOS 原生管理员授权对话框，不再先失败再重试。
-- 先确认应用本体能够移除，再处理相关数据，避免留下一个被清空数据但仍存在的应用。
+Review an app and its associated data in one confirmation flow.
 
-### 磁盘与资源管理
+- Scan standard app directories and show app status, location, and size.
+- Identify bundle IDs, associated data, and other registered copies of an app.
+- Analyze related login items, launch agents, and background configurations, distinguishing confirmed, possible, and shared associations.
+- Review the app, individual leftover files, and removable startup configurations in a dedicated confirmation view.
+- Follow removal paths and live progress. A separate results window gathers successes, failures, and permission actions.
+- Removing protected apps from `/Applications` presents the native macOS administrator authorization dialog immediately after confirmation, without requiring an initial failed attempt.
+- Confirm that the app itself can be removed before processing its data, avoiding an app left installed with its data deleted.
 
-空间去了哪里，MacScope 帮你把答案列出来。
+### Disk and resource tools
 
-| 工具 | 用途 |
+Find out where your space is going.
+
+| Tool | Purpose |
 | --- | --- |
-| **大文件** | 在指定文件夹中查找超过阈值的文件，按大小快速定位空间占用 |
-| **重复文件** | 通过文件大小和内容哈希确认重复项，并确保每组至少保留一份 |
-| **快速内存释放** | 通过 macOS 原生管理员授权请求系统回收符合条件的非活跃文件缓存，不关闭正在运行的应用 |
+| **Large Files** | Find files above a chosen size in selected folders and sort them by size |
+| **Duplicates** | Verify duplicates by size and content hash, preserving at least one copy per group |
+| **Quick Memory Release** | Use native macOS administrator authorization to request reclamation of eligible inactive file caches without closing running apps |
 
-大文件和重复文件默认扫描当前用户的 `Downloads`、`Desktop`、`Documents` 和 `Movies`，也可以在设置中添加或移除扫描目录。
+Large file and duplicate scans default to your `Downloads`, `Desktop`, `Documents`, and `Movies` folders. Add or remove scan folders in Settings.
 
-## 常见使用场景
+## Common workflows
 
-- **Mac 突然发热：** 按 CPU 排序，找出持续高占用的进程，再查看它最近 1 分钟的活动。
-- **内存压力升高：** 按内存排序确认主要占用者，必要时使用快速内存释放。
-- **磁盘空间不足：** 依次检查垃圾、大文件和重复文件，把可回收空间变成清晰列表。
-- **应用卸载不干净：** 选择应用，同时检查相关数据和其他副本，再统一确认处理。
-- **只想快速看一眼：** 在菜单栏显示 CPU、内存或网速，不必打开主窗口。
-- **端口被占用：** 输入端口号找到对应软件，打开本机地址或结束相关进程。
-- **机器发热或风扇加速：** 对照 CPU、整机功耗、温度和风扇曲线，判断负载与散热变化是否一致。
-- **启动项留有残余：** 在“需要处理”中找到目标已经不存在的登录项或后台配置，再确认清除。
-- **下载文件太乱：** 分类检查安装包、压缩包、重复下载和旧文件，再决定移除哪些项目。
-- **确认硬件状态：** 集中查看芯片、内存、显示器、无线连接和电池健康信息。
+- **Mac getting hot:** sort by CPU, find consistently busy processes, and inspect their last minute of activity.
+- **Memory pressure rising:** sort by memory to identify the main consumers; use Quick Memory Release when needed.
+- **Disk running low:** review junk, large files, and duplicates to identify reclaimable space.
+- **App leftovers:** review an app's data and other copies before confirming removal.
+- **A quick status check:** show CPU, memory, or network speed in the menu bar.
+- **Port already in use:** search its number, identify the app, and open its local address or stop the process.
+- **Heat or loud fans:** compare CPU, system power, temperature, and fan charts to relate workload to cooling.
+- **Stale startup entries:** review login items and background configurations with missing targets in Needs Attention.
+- **Messy downloads:** review installers, archives, duplicate downloads, and old files by category.
+- **Hardware checks:** inspect chip, memory, displays, wireless connections, and battery health together.
 
-## 下载与安装
+## Download and installation
 
-1. 前往 [GitHub Releases](https://github.com/shenmuoso/mac-scope/releases) 下载最新的 `MacScope-*.dmg`。
-2. 打开 DMG，将 `MacScope.app` 拖入 `Applications` 文件夹。
-3. 从“应用程序”启动 MacScope。
+1. Download the latest `MacScope-*.dmg` from [GitHub Releases](https://github.com/shenmuoso/mac-scope/releases).
+2. Open the DMG and drag `MacScope.app` into `Applications`.
+3. Launch MacScope from Applications.
 
 > [!IMPORTANT]
-> 当前 Release 使用 ad-hoc 开发签名，尚未完成 Apple Developer ID 公证。请只打开从本仓库 Releases 页面下载的安装包。MacScope 不会要求你在应用自己的界面中输入管理员密码。
+> Current releases use an ad-hoc development signature and are not notarized with an Apple Developer ID. Only open packages downloaded from this repository's Releases page. MacScope never asks you to type an administrator password into its own interface.
 
-### 首次打开 MacScope
+### Opening MacScope for the first time
 
-如果 macOS 提示无法验证开发者或阻止打开，请按以下步骤操作：
+If macOS cannot verify the developer or blocks the app:
 
-1. 确认已经将 `MacScope.app` 拖入“应用程序”文件夹，并尝试打开一次。
-2. 在系统提示中点击“完成”或关闭提示窗口。
-3. 打开苹果菜单，进入“系统设置 > 隐私与安全”。
-4. 向下滚动到“安全性”，找到 MacScope 被阻止打开的提示。
-5. 点击“仍要打开”，使用 Touch ID 或管理员密码确认。
-6. 在最后的确认窗口中再次点击“打开”。以后启动同一构建通常不再需要重复这些步骤。
+1. Make sure `MacScope.app` is in Applications and try opening it once.
+2. Click Done or dismiss the system alert.
+3. Open Apple menu > System Settings > Privacy & Security.
+4. Scroll to Security and find the notice about MacScope being blocked.
+5. Click Open Anyway and confirm with Touch ID or an administrator password.
+6. Click Open in the final confirmation dialog. The same build usually needs no further confirmation.
 
-也可以在 Finder 的“应用程序”文件夹中右键 `MacScope.app`，选择“打开”，然后在确认窗口中再次选择“打开”。替换不同的 ad-hoc 签名构建后，macOS 可能要求重新确认。
+You can also right-click `MacScope.app` in Finder's Applications folder, choose Open, and confirm Open again. Replacing it with a different ad-hoc signed build may require another confirmation.
 
-## 个性化设置
+## Preferences
 
-界面偏好使用 macOS `UserDefaults` 持久化；登录启动和隐私权限由 macOS 管理。
+Interface preferences are persisted with macOS `UserDefaults`. Login startup and privacy permissions are managed by macOS.
 
-| 类别 | 可配置内容 |
+| Category | Options |
 | --- | --- |
-| **监控** | 0.5/1/2/5 秒刷新频率、Top 5/10/20/50、摄氏度或华氏度 |
-| **菜单栏** | 开关、仅图标或紧凑数据、最多三个指标、功耗指标、模块顺序、进程排序与数量、彩色模式 |
-| **外观** | 跟随系统、浅色、深色、强调色方案、玻璃/均衡/磨砂材质、透明侧栏开关、Dock 图标显示与深浅外观 |
-| **清理** | 缓存处理方式、清理前确认、大文件阈值、重复文件阈值、下载文件时间范围和扫描目录 |
-| **权限管理** | 登录时自动启动、完全磁盘访问设置和按需管理员授权说明 |
-| **语言** | English 或简体中文；默认使用 English |
+| **Monitoring** | 0.5/1/2/5-second refresh intervals, top 5/10/20/50 processes, Celsius or Fahrenheit |
+| **Menu Bar** | Enable or disable, icon or compact metrics, up to three metrics, power metrics, module order, process sorting and count, Color Mode |
+| **Appearance** | System/light/dark, accent colors, Glass/Balanced/Frosted materials, translucent sidebar, Dock icon visibility and appearance |
+| **Cleanup** | Cache handling, confirmation, large file and duplicate thresholds, download age ranges, scan folders |
+| **Permissions** | Open at login, Full Disk Access settings, and on-demand administrator authorization information |
+| **App Language** | English or Simplified Chinese; English is the default |
 
-设置文件由系统保存在：
+The system stores preferences at:
 
 ```text
 ~/Library/Preferences/com.shenmuoso.macscope.plist
 ```
 
-## 隐私、权限与安全
+## Privacy, permissions, and safety
 
-- 系统指标、进程信息和扫描结果只在本机处理，MacScope 不上传这些数据。
-- 更新检查只请求 GitHub 最新 Release 信息；发现更高版本时在侧边栏底部显示下载入口。
-- 文件默认移到废纸篓，MacScope 不会自动清空废纸篓。
-- 应用、应用残留、大文件和重复文件始终移到废纸篓，不会直接永久删除。
-- 下载清理只扫描当前用户的 `Downloads`，清理前始终展示分类、路径、大小和修改时间。
-- 只有可重建缓存和开发者文件可以在设置允许时永久删除。
-- 某些用户资源库路径需要“完全磁盘访问权限”，可从“设置 > 权限管理”打开对应系统设置。
-- 移除受保护应用或释放文件缓存时，MacScope 会在执行前立即显示 macOS 标准管理员授权对话框。
-- 启动或恢复风扇控制时同样使用 macOS 标准管理员授权对话框；临时 Helper 经过哈希校验后从 `/var/tmp` 运行，结束后删除，不安装常驻 root 服务。
-- MacScope 不读取、不接收也不保存管理员密码。
-- 扫描会跳过符号链接和应用包内部，避免越过用户选择的目录边界。
+- System metrics, process data, and scan results are processed locally and are not uploaded.
+- Update checks request only the latest GitHub release metadata. A download entry appears at the bottom of the sidebar when a newer version is available.
+- Files move to Trash by default; MacScope never empties Trash automatically.
+- Apps, app leftovers, large files, and duplicates always move to Trash rather than being permanently deleted.
+- Downloads Cleanup scans only your `Downloads` folder and always shows categories, paths, sizes, and modification dates before cleanup.
+- Only rebuildable caches and developer files may be permanently deleted when allowed in Settings.
+- Some Library folders require Full Disk Access. Open the relevant system settings from Settings > Permissions.
+- Removing protected apps or releasing file caches immediately presents the standard macOS administrator authorization dialog before execution.
+- Starting or restoring fan control uses the same macOS dialog. A hash-verified temporary helper runs from `/var/tmp` and is removed afterward; no persistent root service is installed.
+- MacScope does not read, receive, or store administrator passwords.
+- Scans skip symbolic links and app bundle contents to stay within the selected directory boundaries.
 
-### 开启完全磁盘访问权限
+### Enabling Full Disk Access
 
-1. 打开 MacScope 的“设置 > 权限管理”，点击“打开完全磁盘访问设置”。
-2. 在系统设置列表中打开 MacScope 右侧的开关。
-3. 如果开关已经打开但权限仍未生效，请选中 MacScope 并点击列表下方的 `−` 删除，再点击 `+` 重新添加 `/Applications/MacScope.app`。
-4. 退出并重新打开 MacScope。
+1. In MacScope, open Settings > Permissions > Open Full Disk Access Settings.
+2. Enable the switch next to MacScope in System Settings.
+3. If already enabled but access still fails, remove MacScope with the `−` button, then use `+` to add `/Applications/MacScope.app` again.
+4. Quit and reopen MacScope.
 
-当前版本采用 ad-hoc 签名。替换不同构建的测试包后，macOS 可能仍显示旧授权条目，但新程序身份已发生变化，因此可能需要执行一次删除并重新添加。
+With ad-hoc signing, replacing a test build can change the app's identity while macOS retains the old permission entry. Removing and adding the app again may be necessary.
 
-## 系统要求
+## Requirements
 
-- macOS 13 Ventura 或更高版本。
-- 当前 GitHub Release DMG 面向 Apple Silicon Mac；Intel Mac 可以使用匹配的 Swift 工具链从源码构建。
-- 原生应用无需 Python、Textual、Homebrew 或其他运行时。
-- 温度读取依赖当前机型和 macOS 暴露的 IOHID 传感器。温度显示“不可用”时，其他监控功能仍可正常工作。
+- macOS 13 Ventura or later.
+- Current GitHub release DMGs target Apple Silicon. Intel Macs can build from source with a compatible Swift toolchain.
+- The native app does not require Python, Textual, Homebrew, or another runtime.
+- Temperature readings depend on the IOHID sensors exposed by your Mac and macOS. Other monitoring features continue working when temperature is unavailable.
 
-## 常见问题
+## FAQ
 
-### 为什么首次采样的 CPU、磁盘或网络速率是 0？
+### Why are CPU, disk, or network rates initially zero?
 
-速率需要比较前后两次系统计数才能计算。等待一个刷新周期后即可显示实时值。
+Rates are calculated from the difference between two samples. Wait one refresh interval for live values.
 
-### 为什么有些文件显示需要完全磁盘访问权限？
+### Why do some files require Full Disk Access?
 
-macOS 会保护部分用户资源库目录。MacScope 只会明确提示权限问题，不会绕过系统保护；授权后重新扫描即可。
+macOS protects some user Library folders. MacScope reports the permission issue without bypassing system protections; grant access and rescan.
 
-如果系统设置中的 MacScope 开关已经打开但扫描仍受限，请删除该权限条目，重新添加 `/Applications/MacScope.app`，然后退出并重新打开 MacScope。
+If the switch is already on but scans remain restricted, remove the permission entry, add `/Applications/MacScope.app` again, and restart MacScope.
 
-### 管理员授权时，MacScope 会看到我的密码吗？
+### Can MacScope see my administrator password?
 
-不会。密码输入框由 macOS 提供，认证过程由系统处理，MacScope 只接收操作是否获准的结果。
+No. macOS provides the password dialog and handles authentication. MacScope receives only the authorization result.
 
-### 为什么温度显示“不可用”？
+### Why is temperature unavailable?
 
-不同 Mac 和 macOS 版本暴露的传感器不同。这不影响 CPU、内存、磁盘、网络和进程监控。
+Sensors vary between Macs and macOS releases. CPU, memory, disk, network, and process monitoring are unaffected.
 
-### 为什么功耗或风扇数据显示“不可用”？
+### Why are power or fan readings unavailable?
 
-MacScope 只显示当前机型和 macOS 实际暴露的传感器数据。无风扇 Mac、未连接电源或系统未提供对应读数时，不会使用估算值填充。
+MacScope shows only telemetry actually exposed by your hardware and macOS. It does not substitute estimates when the Mac is fanless, power is disconnected, or a sensor reading is unavailable.
 
-### 最大散热为什么显示不可用？
+### Why is Maximum Cooling unavailable?
 
-0.4.12 只在 MacScope 能读取风扇数量、硬件最高转速和目标转速，并能在授权后回读验证写入结果时开放控制。无风扇 Mac、SMC 键格式未知或系统拒绝写入时会保持只读。该功能依赖 Apple 未公开的 SMC 接口，属于实验性功能，可能因机型或 macOS 更新而不可用。
+Control is enabled only when MacScope can read fan count, hardware maximum RPM, and target RPM, then verify writes after authorization. Fanless Macs hide the controls; unknown SMC formats or rejected writes leave controls read-only. This experimental feature uses private Apple SMC interfaces and may be unavailable on some models or after macOS updates.
 
-## 从源码构建
+## Build from source
 
-需要 macOS 13+、Xcode Command Line Tools，以及推荐的 Swift 6 工具链。
+Requires macOS 13+, Xcode Command Line Tools, and preferably a Swift 6 toolchain.
 
 ```bash
 git clone git@github.com:shenmuoso/mac-scope.git
@@ -292,29 +302,29 @@ cd mac-scope
 native/scripts/run_app.sh debug
 ```
 
-只构建原生 App：
+Build only the native app:
 
 ```bash
 native/scripts/build_app.sh release
 ```
 
-构建可发布的 DMG：
+Build a release DMG:
 
 ```bash
 native/scripts/build_dmg.sh release
 ```
 
-默认输出：
+Default output:
 
 ```text
 native/build/MacScope-0.4.13.dmg
 ```
 
-仓库仍保留早期 Python/Textual 终端版本用于兼容与历史参考，但它不是当前原生应用的运行依赖。
+The earlier Python/Textual terminal version remains in the repository for compatibility and historical reference. It is not a runtime dependency of the native app.
 
-## 项目与反馈
+## Project and feedback
 
-- [下载与历史版本](https://github.com/shenmuoso/mac-scope/releases)
-- [提交问题或功能建议](https://github.com/shenmuoso/mac-scope/issues)
-- [项目主页](https://github.com/shenmuoso/mac-scope)
-- [作者主页](https://github.com/shenmuoso)
+- [Downloads and release history](https://github.com/shenmuoso/mac-scope/releases)
+- [Report bugs or request features](https://github.com/shenmuoso/mac-scope/issues)
+- [Project homepage](https://github.com/shenmuoso/mac-scope)
+- [Author](https://github.com/shenmuoso)
