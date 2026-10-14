@@ -34,7 +34,7 @@ final class MenuBarDashboardPanel: NSPanel {
   ) {
     self.reduceMotion = reduceMotion
     super.init(
-      contentRect: NSRect(x: 0, y: 0, width: 390, height: 500),
+      contentRect: NSRect(x: 0, y: 0, width: MenuBarDashboardLayout.width, height: 500),
       styleMask: [.borderless, .nonactivatingPanel],
       backing: .buffered,
       defer: true

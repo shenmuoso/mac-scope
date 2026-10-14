@@ -2,56 +2,46 @@ import AppKit
 import Charts
 import SwiftUI
 
-private struct MenuBarForegroundKey: EnvironmentKey {
-  static let defaultValue = Color.primary
-}
-
-private extension EnvironmentValues {
-  var menuBarForeground: Color {
-    get { self[MenuBarForegroundKey.self] }
-    set { self[MenuBarForegroundKey.self] = newValue }
-  }
-}
-
 struct MenuBarDashboardView: View {
   @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var metrics: SystemMetricsStore
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
-  @Environment(\.colorScheme) private var colorScheme
 
   var maximumHeight: CGFloat = 650
   let openMainWindow: () -> Void
   let openSettings: () -> Void
 
-  // Semantic label colors become vibrant inside native glass; keep telemetry text fully legible.
-  private var foreground: Color { colorScheme == .dark ? .white : .black }
-
   var body: some View {
+    let modules = settings.menuBarModules
     VStack(spacing: 0) {
       header
       Divider()
+        .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
       ScrollView {
         LazyVStack(spacing: 0) {
-          ForEach(Array(settings.menuBarModules.enumerated()), id: \.element.id) {
+          ForEach(Array(modules.enumerated()), id: \.element.id) {
             index,
             module in
             moduleView(module)
-            if index < settings.menuBarModules.count - 1 {
+            if index < modules.count - 1,
+              module == .processes || modules[index + 1] == .processes
+            {
               Divider()
-                .padding(.leading, 44)
+                .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
             }
           }
         }
+        .padding(.vertical, MenuBarDashboardLayout.contentInset)
       }
       .compactNativeScrollers(clearsBackground: true)
       Divider()
+        .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
       footer
     }
-    .foregroundStyle(foreground)
-    .environment(\.menuBarForeground, foreground)
-    .frame(width: 390, height: Self.contentSize(
-      modules: settings.menuBarModules,
+    .foregroundStyle(.primary)
+    .frame(width: MenuBarDashboardLayout.width, height: Self.contentSize(
+      modules: modules,
       processLimit: settings.menuBarProcessLimit,
       maximumHeight: maximumHeight
     ).height)
@@ -65,53 +55,69 @@ struct MenuBarDashboardView: View {
     let metricCount = modules.filter { $0 != .processes }.count
     let processHeight =
       modules.contains(.processes)
-      ? 48 + CGFloat(processLimit) * 32
+      ? MenuBarDashboardLayout.processHeaderHeight
+        + CGFloat(processLimit) * MenuBarDashboardLayout.processRowHeight
       : 0
-    let height = min(maximumHeight, min(650, max(250, 112 + CGFloat(metricCount) * 82 + processHeight)))
-    return NSSize(width: 390, height: height)
+    let sectionDividerCount = zip(modules, modules.dropFirst()).count {
+      $0.0 == .processes || $0.1 == .processes
+    }
+    let contentHeight = MenuBarDashboardLayout.headerHeight + MenuBarDashboardLayout.footerHeight
+      + MenuBarDashboardLayout.contentInset * 2 + 2 + CGFloat(sectionDividerCount)
+      + CGFloat(metricCount) * MenuBarDashboardLayout.metricRowHeight + processHeight
+    let height = min(maximumHeight, min(650, max(140, contentHeight)))
+    return NSSize(width: MenuBarDashboardLayout.width, height: height)
   }
 
   private var header: some View {
-    HStack(spacing: 11) {
+    HStack(spacing: 10) {
       MenuBarLogo(color: dashboardLogoColor)
-        .frame(width: 27, height: 27)
+        .frame(width: MenuBarDashboardLayout.iconSize, height: MenuBarDashboardLayout.iconSize)
 
       VStack(alignment: .leading, spacing: 2) {
         Text("MacScope")
           .font(.headline)
         if monitor.isPaused {
           Text("Monitoring Paused")
-            .foregroundStyle(foreground.opacity(0.9))
+            .foregroundStyle(.secondary)
         } else {
           Text(
             "Updated \(metrics.snapshot.timestamp.formatted(date: .omitted, time: .standard))"
           )
-          .foregroundStyle(foreground.opacity(0.9))
+          .foregroundStyle(.secondary)
         }
       }
-      .font(.caption)
+      .font(.subheadline)
 
       Spacer()
 
       Button(action: monitor.togglePause) {
-        Image(systemName: monitor.isPaused ? "play.fill" : "pause.fill")
-          .frame(width: 20, height: 20)
+        Label(
+          monitoringActionTitle,
+          systemImage: monitor.isPaused ? "play.fill" : "pause.fill"
+        )
+        .labelStyle(.iconOnly)
+        .frame(width: MenuBarDashboardLayout.actionSize, height: MenuBarDashboardLayout.actionSize)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(foreground)
-      .help(monitor.isPaused ? "Resume Monitoring" : "Pause Monitoring")
+      .help(monitoringActionTitle)
 
       Button(action: { monitor.refreshNow() }) {
-        Image(systemName: "arrow.clockwise")
-          .frame(width: 20, height: 20)
+        Label("Refresh", systemImage: "arrow.clockwise")
+          .labelStyle(.iconOnly)
+          .frame(width: MenuBarDashboardLayout.actionSize, height: MenuBarDashboardLayout.actionSize)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(foreground)
       .help("Refresh Now")
       .disabled(monitor.isRefreshing)
     }
-    .padding(.horizontal, 14)
-    .frame(height: 60)
+    .font(.body)
+    .controlSize(.small)
+    .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+    .frame(height: MenuBarDashboardLayout.headerHeight)
+  }
+
+  private var monitoringActionTitle: LocalizedStringKey {
+    monitor.isPaused ? "Resume Monitoring" : "Pause Monitoring"
   }
 
   @ViewBuilder
@@ -129,34 +135,35 @@ struct MenuBarDashboardView: View {
         Label("Open MacScope", systemImage: "macwindow")
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(foreground)
 
       Spacer()
 
       Button(action: openSettings) {
-        Image(systemName: "gearshape")
-          .frame(width: 20, height: 20)
+        Label("Settings", systemImage: "gearshape")
+          .labelStyle(.iconOnly)
+          .frame(width: MenuBarDashboardLayout.actionSize, height: MenuBarDashboardLayout.actionSize)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(foreground)
       .help("Settings")
 
       Button {
         NSApp.terminate(nil)
       } label: {
-        Image(systemName: "power")
-          .frame(width: 20, height: 20)
+        Label("Quit MacScope", systemImage: "power")
+          .labelStyle(.iconOnly)
+          .frame(width: MenuBarDashboardLayout.actionSize, height: MenuBarDashboardLayout.actionSize)
       }
       .buttonStyle(.borderless)
-      .foregroundStyle(foreground)
       .help("Quit MacScope")
     }
-    .padding(.horizontal, 14)
-    .frame(height: 50)
+    .font(.body)
+    .controlSize(.small)
+    .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+    .frame(height: MenuBarDashboardLayout.footerHeight)
   }
 
   private var dashboardLogoColor: Color {
-    settings.menuBarColorfulMode ? settings.activeTheme.accentColor : foreground
+    settings.menuBarColorfulMode ? settings.activeTheme.accentColor : .primary
   }
 
   private func openProcess(_ process: ProcessRow) {
@@ -168,38 +175,48 @@ struct MenuBarDashboardView: View {
 private struct MenuBarMetricRow: View {
   @EnvironmentObject private var metrics: SystemMetricsStore
   @EnvironmentObject private var settings: AppSettings
-  @Environment(\.menuBarForeground) private var foreground
 
   let module: MenuBarModule
 
   var body: some View {
     let presentation = presentation
-    HStack(spacing: 11) {
+    HStack(spacing: 10) {
       Image(systemName: module.systemImage)
-        .font(.system(size: 15, weight: .medium))
+        .font(.body)
         .foregroundStyle(presentation.accentColor)
-        .frame(width: 20)
+        .frame(width: MenuBarDashboardLayout.iconSize, height: MenuBarDashboardLayout.iconSize)
+        .background {
+          Circle().fill(
+            settings.menuBarColorfulMode
+              ? presentation.accentColor.opacity(0.12)
+              : Color(nsColor: .quaternaryLabelColor)
+          )
+        }
+        .accessibilityHidden(true)
 
       VStack(alignment: .leading, spacing: 4) {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
           Text(LocalizedStringKey(module.title))
-            .font(.subheadline.weight(.semibold))
+            .font(.body)
+            .lineLimit(1)
           Spacer(minLength: 4)
           Text(presentation.value)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(presentation.valueColor)
+            .font(.body.weight(.medium))
             .monospacedDigit()
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
         }
 
         Text(presentation.detail)
-          .font(.caption)
-          .foregroundStyle(foreground.opacity(0.9))
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
           .monospacedDigit()
           .lineLimit(1)
 
         if let progress = presentation.progress {
           ProgressView(value: min(1, max(0, progress)))
             .progressViewStyle(.linear)
+            .controlSize(.small)
             .tint(presentation.progressColor)
         }
       }
@@ -208,27 +225,26 @@ private struct MenuBarMetricRow: View {
         module: module,
         history: metrics.history,
         endDate: metrics.snapshot.timestamp,
-        color: presentation.accentColor
+        color: settings.menuBarColorfulMode ? presentation.accentColor : .secondary
       )
-      .frame(width: 86, height: 40)
+      .frame(
+        width: MenuBarDashboardLayout.sparklineWidth,
+        height: MenuBarDashboardLayout.sparklineHeight
+      )
+      .accessibilityHidden(true)
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 9)
-    .frame(minHeight: 82)
+    .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+    .frame(height: MenuBarDashboardLayout.metricRowHeight)
   }
 
   private var presentation: MetricPresentation {
     let snapshot = metrics.snapshot
     let theme = settings.activeTheme
-    let neutralAccent = foreground.opacity(0.85)
-    let neutralProgress = foreground.opacity(0.7)
+    let neutralAccent = Color.primary
+    let neutralProgress = Color.secondary
 
     func accent(_ colorfulColor: Color) -> Color {
       settings.menuBarColorfulMode ? colorfulColor : neutralAccent
-    }
-
-    func emphasizedValue(_ colorfulColor: Color) -> Color {
-      settings.menuBarColorfulMode ? colorfulColor : foreground
     }
 
     func progress(_ colorfulColor: Color) -> Color {
@@ -245,7 +261,6 @@ private struct MenuBarMetricRow: View {
           DisplayFormat.percent(snapshot.cpu.system)
         ),
         accentColor: accent(theme.cpuColor),
-        valueColor: foreground,
         progress: snapshot.cpu.total / 100,
         progressColor: progress(
           MetricColorScale.utilization(fraction: snapshot.cpu.total / 100)
@@ -260,7 +275,6 @@ private struct MenuBarMetricRow: View {
           DisplayFormat.bytes(snapshot.memory.total)
         ),
         accentColor: accent(theme.memoryColor),
-        valueColor: foreground,
         progress: snapshot.memory.fraction,
         progressColor: progress(
           MetricColorScale.utilization(fraction: snapshot.memory.fraction)
@@ -272,7 +286,6 @@ private struct MenuBarMetricRow: View {
         value: utilization.map(DisplayFormat.percent) ?? "--",
         detail: localized(utilization == nil ? "GPU Telemetry Unavailable" : "Apple Silicon GPU"),
         accentColor: accent(theme.gpuColor),
-        valueColor: foreground,
         progress: utilization.map { $0 / 100 },
         progressColor: progress(MetricColorScale.utilization(fraction: (utilization ?? 0) / 100))
       )
@@ -282,19 +295,16 @@ private struct MenuBarMetricRow: View {
         detail:
           "↓ \(DisplayFormat.rate(snapshot.disk.readRate))  ↑ \(DisplayFormat.rate(snapshot.disk.writeRate))",
         accentColor: accent(theme.diskColor),
-        valueColor: foreground,
         progress: snapshot.disk.fraction,
         progressColor: progress(
           MetricColorScale.utilization(fraction: snapshot.disk.fraction)
         )
       )
     case .network:
-      let totalRate = snapshot.network.downloadRate + snapshot.network.uploadRate
       return MetricPresentation(
         value: "↓ \(DisplayFormat.rate(snapshot.network.downloadRate))",
         detail: "↑ \(DisplayFormat.rate(snapshot.network.uploadRate))",
         accentColor: accent(theme.networkColor),
-        valueColor: emphasizedValue(MetricColorScale.network(rate: totalRate)),
         progress: nil,
         progressColor: .clear
       )
@@ -304,7 +314,6 @@ private struct MenuBarMetricRow: View {
         value: DisplayFormat.temperature(temperature, unit: settings.temperatureUnit) ?? "--",
         detail: temperatureStatus(snapshot.cpu.temperature.status),
         accentColor: accent(MetricColorScale.temperature(celsius: temperature)),
-        valueColor: emphasizedValue(MetricColorScale.temperature(celsius: temperature)),
         progress: nil,
         progressColor: .clear
       )
@@ -313,7 +322,6 @@ private struct MenuBarMetricRow: View {
         value: DisplayFormat.power(snapshot.power.systemWatts) ?? "--",
         detail: systemPowerDetail(snapshot.power),
         accentColor: accent(.orange),
-        valueColor: foreground,
         progress: nil,
         progressColor: .clear
       )
@@ -322,7 +330,6 @@ private struct MenuBarMetricRow: View {
         value: DisplayFormat.power(snapshot.power.chargingWatts) ?? "--",
         detail: chargingPowerDetail(snapshot.power),
         accentColor: accent(.green),
-        valueColor: foreground,
         progress: nil,
         progressColor: .clear
       )
@@ -331,7 +338,6 @@ private struct MenuBarMetricRow: View {
         value: DisplayFormat.fanSpeed(snapshot.cooling.fans.map(\.currentRPM).max()) ?? "--",
         detail: fanDetail(snapshot.cooling),
         accentColor: accent(.blue),
-        valueColor: foreground,
         progress: nil,
         progressColor: .clear
       )
@@ -386,7 +392,6 @@ private struct MetricPresentation {
   let value: String
   let detail: String
   let accentColor: Color
-  let valueColor: Color
   let progress: Double?
   let progressColor: Color
 }
@@ -412,7 +417,7 @@ private struct MetricSparkline: View {
           y: .value("Value", point.value)
         )
         .interpolationMethod(.catmullRom)
-        .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        .lineStyle(StrokeStyle(lineWidth: 1.25, lineCap: .round, lineJoin: .round))
       }
       .foregroundStyle(color)
       .chartXAxis(.hidden)
@@ -483,7 +488,6 @@ private struct MetricSparkline: View {
 private struct MenuBarProcessesView: View {
   @EnvironmentObject private var monitor: SystemMonitor
   @EnvironmentObject private var settings: AppSettings
-  @Environment(\.menuBarForeground) private var foreground
 
   let onSelect: (ProcessRow) -> Void
 
@@ -492,6 +496,7 @@ private struct MenuBarProcessesView: View {
       HStack {
         Label("Top Processes", systemImage: "list.number")
           .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.secondary)
         Spacer()
         Picker("Process sorting", selection: $settings.menuBarProcessSort) {
           ForEach(MenuBarProcessSort.allCases) { sort in
@@ -500,21 +505,22 @@ private struct MenuBarProcessesView: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
+        .controlSize(.small)
         .frame(width: 94)
       }
-      .padding(.horizontal, 14)
-      .frame(height: 44)
+      .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+      .frame(height: MenuBarDashboardLayout.processHeaderHeight)
 
       if visibleProcesses.isEmpty {
         HStack(spacing: 8) {
           ProgressView()
             .controlSize(.small)
           Text("Collecting process activity")
-            .foregroundStyle(foreground.opacity(0.9))
+            .foregroundStyle(.secondary)
         }
-        .font(.caption)
+        .font(.subheadline)
         .frame(maxWidth: .infinity)
-        .frame(height: CGFloat(settings.menuBarProcessLimit) * 32)
+        .frame(height: CGFloat(settings.menuBarProcessLimit) * MenuBarDashboardLayout.processRowHeight)
       } else {
         ForEach(visibleProcesses) { process in
           MenuBarProcessRow(
@@ -560,7 +566,6 @@ private struct MenuBarProcessesView: View {
 }
 
 private struct MenuBarProcessRow: View {
-  @Environment(\.menuBarForeground) private var foreground
   let process: ProcessRow
   let value: String
   let action: () -> Void
@@ -571,21 +576,23 @@ private struct MenuBarProcessRow: View {
     Button(action: action) {
       HStack(spacing: 8) {
         Image(systemName: "app.fill")
-          .font(.caption)
-          .foregroundStyle(foreground.opacity(0.85))
+          .font(.body)
+          .foregroundStyle(.secondary)
           .frame(width: 18)
+          .accessibilityHidden(true)
         Text(process.name)
           .lineLimit(1)
         Spacer(minLength: 8)
         Text(value)
-          .foregroundStyle(foreground.opacity(0.9))
+          .foregroundStyle(.secondary)
           .monospacedDigit()
+          .fixedSize(horizontal: true, vertical: false)
       }
-      .font(.caption)
-      .padding(.horizontal, 14)
-      .frame(height: 32)
+      .font(.body)
+      .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+      .frame(height: MenuBarDashboardLayout.processRowHeight)
       .contentShape(Rectangle())
-      .background(isHovered ? foreground.opacity(0.06) : Color.clear)
+      .background(isHovered ? Color.primary.opacity(0.06) : Color.clear)
     }
     .buttonStyle(.plain)
     .onHover { isHovered = $0 }
