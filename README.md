@@ -25,14 +25,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.13-1677ff" alt="Version 0.4.13">
+  <img src="https://img.shields.io/badge/version-0.5.1-1677ff" alt="Version 0.5.1">
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI%20%2B%20AppKit-Native-f05138?logo=swift" alt="SwiftUI and AppKit">
   <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="App languages: English and Simplified Chinese">
 </p>
 
 > [!TIP]
-> **0.4.13: native grouped views and display control.** System information, displays, battery, performance, and memory use native grouped forms. Change resolution, HiDPI, and refresh rate, and adjust brightness, contrast, volume, and ICC profiles on supported hardware.
+> **0.5.1: a refined menu bar dashboard and more reliable maintenance.** The dashboard uses system typography, clearer text hierarchy, and a compact layout. Window titles and process confirmations follow the selected language, cleanup selections have accessible labels, and callbacks from cancelled operations cannot overwrite a newer task's state.
 
 MacScope brings your Mac's essential information together in a clear, native interface. Built with SwiftUI and AppKit, it includes no Electron, embedded browser, or additional runtime. No Terminal, Python, or Homebrew is needed to use the app.
 
@@ -317,7 +317,7 @@ native/scripts/build_dmg.sh release
 Default output:
 
 ```text
-native/build/MacScope-0.4.13.dmg
+native/build/MacScope-0.5.1.dmg
 ```
 
 The earlier Python/Textual terminal version remains in the repository for compatibility and historical reference. It is not a runtime dependency of the native app.

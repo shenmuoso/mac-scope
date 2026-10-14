@@ -25,14 +25,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.13-1677ff" alt="Version 0.4.13">
+  <img src="https://img.shields.io/badge/version-0.5.1-1677ff" alt="Version 0.5.1">
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI%20%2B%20AppKit-Native-f05138?logo=swift" alt="SwiftUI and AppKit">
   <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="English and Simplified Chinese">
 </p>
 
 > [!TIP]
-> **0.4.13：原生分组界面与显示器控制。** 信息、显示器、电池、性能和内存页面采用系统分组表单；显示器页面支持分辨率、HiDPI 和刷新率切换，以及受支持硬件的亮度、对比度、音量与 ICC 描述文件调节。
+> **0.5.1：菜单栏看板优化与维护稳定性改进。** 看板采用系统字体、更清晰的文字层级和紧凑布局；窗口标题与进程确认弹窗随语言切换，清理选择控件补充可访问性标签，已取消任务的回调不会覆盖新任务状态。
 
 MacScope 把一台 Mac 最值得关注的状态集中在一个清爽的原生界面中。它由 SwiftUI 与 AppKit 构建，不包含 Electron、内置浏览器或额外运行时；无需终端、Python 和 Homebrew，安装后即可使用。
 
@@ -317,7 +317,7 @@ native/scripts/build_dmg.sh release
 默认输出：
 
 ```text
-native/build/MacScope-0.4.13.dmg
+native/build/MacScope-0.5.1.dmg
 ```
 
 仓库仍保留早期 Python/Textual 终端版本用于兼容与历史参考，但它不是当前原生应用的运行依赖。

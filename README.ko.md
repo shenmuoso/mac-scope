@@ -25,14 +25,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.13-1677ff" alt="버전 0.4.13">
+  <img src="https://img.shields.io/badge/version-0.5.1-1677ff" alt="버전 0.5.1">
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI%20%2B%20AppKit-Native-f05138?logo=swift" alt="SwiftUI 및 AppKit">
   <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="앱 표시 언어: 영어 및 중국어 간체">
 </p>
 
 > [!TIP]
-> **0.4.13: 네이티브 그룹형 화면과 디스플레이 제어.** 시스템 정보, 디스플레이, 배터리, 성능, 메모리 화면에 표준 그룹형 폼을 적용했습니다. 해상도, HiDPI, 재생률을 전환하고, 지원되는 하드웨어의 밝기, 명암, 음량, ICC 프로파일을 조정할 수 있습니다.
+> **0.5.1: 메뉴 막대 대시보드 개선과 유지 관리 안정성 향상.** 시스템 서체, 명확한 텍스트 계층, 간결한 레이아웃을 적용했습니다. 창 제목과 프로세스 확인 대화상자가 선택한 언어를 따르고, 정리 항목 선택 컨트롤에 접근성 레이블을 추가했습니다. 취소된 작업의 콜백이 새 작업의 상태를 덮어쓰지 않도록 수정했습니다.
 
 MacScope는 Mac의 주요 상태를 깔끔한 네이티브 인터페이스에 모아 보여 줍니다. SwiftUI와 AppKit으로 개발했으며 Electron, 내장 브라우저, 추가 런타임을 포함하지 않습니다. 터미널, Python, Homebrew 없이 설치 후 바로 사용할 수 있습니다.
 
@@ -317,7 +317,7 @@ native/scripts/build_dmg.sh release
 기본 출력:
 
 ```text
-native/build/MacScope-0.4.13.dmg
+native/build/MacScope-0.5.1.dmg
 ```
 
 이전 Python/Textual 터미널 버전은 호환성과 기록 보존을 위해 저장소에 남아 있지만 네이티브 앱의 실행 의존성은 아닙니다.
