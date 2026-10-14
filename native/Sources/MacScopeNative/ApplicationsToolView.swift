@@ -446,7 +446,7 @@ private struct ApplicationUninstallView: View {
     isEnabled: Bool
   ) -> some View {
     HStack(spacing: 10) {
-      SelectionCheckbox(isSelected: isSelected, isEnabled: isEnabled)
+      SelectionCheckbox(title: item.name, isSelected: isSelected, isEnabled: isEnabled)
         .frame(width: 22)
       Image(systemName: removalIcon(for: item.kind))
         .foregroundStyle(.secondary)
@@ -522,7 +522,7 @@ private struct ApplicationUninstallView: View {
     isEnabled: Bool
   ) -> some View {
     HStack(spacing: 10) {
-      SelectionCheckbox(isSelected: isSelected, isEnabled: isEnabled)
+      SelectionCheckbox(title: configuration.name, isSelected: isSelected, isEnabled: isEnabled)
         .frame(width: 22)
       Image(systemName: configuration.source.systemImage)
         .foregroundStyle(.secondary)

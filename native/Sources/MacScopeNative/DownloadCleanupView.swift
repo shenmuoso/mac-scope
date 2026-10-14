@@ -159,6 +159,7 @@ struct DownloadCleanupView: View {
     Table(filteredItems) {
       TableColumn("") { item in
         SelectionCheckbox(
+          title: item.name,
           isSelected: selectionBinding(for: item),
           isEnabled: selectedIDs.contains(item.id) || canSelect(item)
         )

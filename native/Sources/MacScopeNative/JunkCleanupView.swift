@@ -95,7 +95,7 @@ struct JunkCleanupView: View {
   private var junkTable: some View {
     Table(store.junkItems) {
       TableColumn("") { item in
-        SelectionCheckbox(isSelected: selectionBinding(for: item.id))
+        SelectionCheckbox(title: item.name, isSelected: selectionBinding(for: item.id))
       }
       .width(34)
 

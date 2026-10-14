@@ -134,6 +134,7 @@ struct FileCleanupView: View {
     Table(items) {
       TableColumn("") { item in
         SelectionCheckbox(
+          title: item.name,
           isSelected: selectionBinding(for: item),
           isEnabled: canToggle(item)
         )
@@ -187,7 +188,7 @@ struct FileCleanupView: View {
   private var largeFileTable: some View {
     Table(items) {
       TableColumn("") { item in
-        SelectionCheckbox(isSelected: selectionBinding(for: item))
+        SelectionCheckbox(title: item.name, isSelected: selectionBinding(for: item))
           .help("Select for removal")
       }
       .width(34)

@@ -118,11 +118,14 @@ struct SystemToolEmptyView<Action: View>: View {
 }
 
 struct SelectionCheckbox: View {
+  let title: String
   @Binding var isSelected: Bool
   var isEnabled = true
 
   var body: some View {
-    Toggle("", isOn: $isSelected)
+    Toggle(isOn: $isSelected) {
+      Text(verbatim: title)
+    }
       .labelsHidden()
       .toggleStyle(.checkbox)
       .disabled(!isEnabled)
