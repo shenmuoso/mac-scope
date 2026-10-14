@@ -16,16 +16,16 @@ private enum StartupItemsSection: String, CaseIterable, Identifiable {
   }
 }
 
-private enum StartupConfirmation: Identifiable {
+private enum StartupConfirmation {
   case removeLoginItem(SystemLoginItem)
   case removeBackgroundItem(StartupItem)
   case disableBackgroundItem(StartupItem)
 
-  var id: String {
+  var title: LocalizedStringKey {
     switch self {
-    case .removeLoginItem(let item): "login:\(item.id)"
-    case .removeBackgroundItem(let item): "remove:\(item.id)"
-    case .disableBackgroundItem(let item): "disable:\(item.id)"
+    case .removeLoginItem: "Stop Opening at Login?"
+    case .removeBackgroundItem: "Remove Startup Remnant?"
+    case .disableBackgroundItem: "Block Startup and Stop Task?"
     }
   }
 }
@@ -123,7 +123,13 @@ struct StartupItemsView: View {
         self.backgroundSelection = nil
       }
     }
-    .alert(item: $confirmation, content: confirmationAlert)
+    .alert(
+      confirmation?.title ?? "",
+      isPresented: confirmationPresentation,
+      presenting: confirmation,
+      actions: confirmationActions,
+      message: confirmationMessage
+    )
     .alert("Startup Item Operation Failed", isPresented: errorBinding) {
       Button("OK", action: store.clearError)
     } message: {
@@ -570,6 +576,13 @@ struct StartupItemsView: View {
     )
   }
 
+  private var confirmationPresentation: Binding<Bool> {
+    Binding(
+      get: { confirmation != nil },
+      set: { if !$0 { confirmation = nil } }
+    )
+  }
+
   private func setStartupAllowed(_ allowed: Bool, for item: StartupItem) {
     if !allowed, item.runtimeState.isRunning {
       confirmation = .disableBackgroundItem(item)
@@ -578,41 +591,40 @@ struct StartupItemsView: View {
     }
   }
 
-  private func confirmationAlert(_ value: StartupConfirmation) -> Alert {
+  @ViewBuilder
+  private func confirmationActions(_ value: StartupConfirmation) -> some View {
     switch value {
     case .removeLoginItem(let item):
-      return Alert(
-        title: Text("Stop Opening at Login?"),
-        message: Text(localized(
-          "%@ will remain installed. This does not close it if it is currently running.",
-          item.name
-        )),
-        primaryButton: .destructive(Text("Remove")) {
-          store.removeLoginItem(item)
-        },
-        secondaryButton: .cancel()
-      )
+      Button("Remove", role: .destructive) {
+        store.removeLoginItem(item)
+      }
     case .removeBackgroundItem(let item):
-      return Alert(
-        title: Text("Remove Startup Remnant?"),
-        message: Text(item.plistURL.path),
-        primaryButton: .destructive(Text("Move to Trash")) {
-          store.removeBackgroundItem(item)
-        },
-        secondaryButton: .cancel()
-      )
+      Button("Move to Trash", role: .destructive) {
+        store.removeBackgroundItem(item)
+      }
+    case .disableBackgroundItem(let item):
+      Button("Block and Stop", role: .destructive) {
+        store.setStartupAllowed(false, for: item)
+      }
+    }
+    Button("Cancel", role: .cancel) { }
+  }
+
+  @ViewBuilder
+  private func confirmationMessage(_ value: StartupConfirmation) -> some View {
+    switch value {
+    case .removeLoginItem(let item):
+      Text(localized(
+        "%@ will remain installed. This does not close it if it is currently running.",
+        item.name
+      ))
+    case .removeBackgroundItem(let item):
+      Text(verbatim: item.plistURL.path)
     case .disableBackgroundItem(let item):
       let message: LocalizedStringKey = item.kind.requiresAdministrator
         ? "This system-wide background task will stop immediately and will not start again automatically. An administrator password is required."
         : "This background task will stop immediately and will not start again automatically."
-      return Alert(
-        title: Text("Block Startup and Stop Task?"),
-        message: Text(message),
-        primaryButton: .destructive(Text("Block and Stop")) {
-          store.setStartupAllowed(false, for: item)
-        },
-        secondaryButton: .cancel()
-      )
+      Text(message)
     }
   }
 
