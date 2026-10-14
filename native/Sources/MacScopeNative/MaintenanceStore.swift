@@ -208,10 +208,11 @@ final class MaintenanceStore: ObservableObject {
 
   func releaseMemory() {
     cancelCurrentOperation()
+    let operationID = UUID()
     NSApp.activate(ignoringOtherApps: true)
     memoryMessage = ""
     activity = MaintenanceActivity(
-      id: UUID(),
+      id: operationID,
       tool: .memory,
       operation: .memory,
       title: l("Releasing File Cache"),
@@ -225,9 +226,9 @@ final class MaintenanceStore: ObservableObject {
       scanIssues: []
     )
     operationTask = Task { [weak self, service] in
-      guard let self else { return }
+      guard let self, !Task.isCancelled, activity?.id == operationID else { return }
       let result = await service.releaseMemory()
-      guard !Task.isCancelled else { return }
+      guard !Task.isCancelled, activity?.id == operationID else { return }
       switch result {
       case .success:
         memoryMessage = l("macOS released eligible inactive file cache.")
@@ -290,17 +291,19 @@ final class MaintenanceStore: ObservableObject {
     activity = nil
   }
 
-  private func beginScan<Value: Sendable>(
+  @discardableResult
+  func beginScan<Value: Sendable>(
     tool: MaintenanceTool,
     title: String,
     operation:
       @escaping @Sendable (MaintenanceService.ScanReporter) async throws -> ScanResult<Value>,
     apply: @escaping @MainActor (ScanResult<Value>) -> Void
-  ) {
+  ) -> Task<Void, Never> {
     cancelCurrentOperation()
+    let operationID = UUID()
     lastScanProgressUpdate = -TimeInterval.infinity
     activity = MaintenanceActivity(
-      id: UUID(),
+      id: operationID,
       tool: tool,
       operation: .scan,
       title: title,
@@ -313,13 +316,13 @@ final class MaintenanceStore: ObservableObject {
       failures: [],
       scanIssues: []
     )
-    operationTask = Task(priority: .utility) { [weak self] in
-      guard let self else { return }
+    let task = Task(priority: .utility) { [weak self] in
+      guard let self, !Task.isCancelled, activity?.id == operationID else { return }
       do {
         let result = try await operation { [weak self] progress in
-          await self?.updateScanProgress(progress)
+          await self?.updateScanProgress(progress, operationID: operationID)
         }
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, activity?.id == operationID else { return }
         apply(result)
         scannedTools.insert(tool)
         issuesByTool[tool] = result.issues
@@ -341,9 +344,11 @@ final class MaintenanceStore: ObservableObject {
           )
         }
       } catch is CancellationError {
+        guard activity?.id == operationID else { return }
         activity?.phase = .cancelled
         activity?.currentPath = l("Cancelled")
       } catch {
+        guard !Task.isCancelled, activity?.id == operationID else { return }
         issuesByTool[tool] = []
         activity?.phase = .completed
         activity?.currentPath = error.localizedDescription
@@ -358,10 +363,12 @@ final class MaintenanceStore: ObservableObject {
         ]
       }
     }
+    operationTask = task
+    return task
   }
 
-  private func updateScanProgress(_ progress: ScanProgress) {
-    guard activity?.phase == .scanning else { return }
+  private func updateScanProgress(_ progress: ScanProgress, operationID: UUID) {
+    guard activity?.id == operationID, activity?.phase == .scanning else { return }
     let now = ProcessInfo.processInfo.systemUptime
     guard now - lastScanProgressUpdate >= 0.2 else { return }
     lastScanProgressUpdate = now
@@ -392,8 +399,9 @@ final class MaintenanceStore: ObservableObject {
 
   private func runCleanup(_ request: CleanupRequest, authorize: Bool) {
     cancelCurrentOperation()
+    let operationID = UUID()
     activity = MaintenanceActivity(
-      id: UUID(),
+      id: operationID,
       tool: request.tool,
       operation: .cleanup,
       title: authorize ? l("Authorizing Cleanup") : request.title,
@@ -415,16 +423,16 @@ final class MaintenanceStore: ObservableObject {
       scanIssues: []
     )
     operationTask = Task { [weak self, service] in
-      guard let self else { return }
+      guard let self, !Task.isCancelled, activity?.id == operationID else { return }
       let result = await service.cleanup(
         items: request.items,
         cacheMode: request.cacheMode,
         allowedRoots: request.roots,
         authorize: authorize
       ) { [weak self] progress in
-        await self?.updateCleanupProgress(progress)
+        await self?.updateCleanupProgress(progress, operationID: operationID)
       }
-      guard !Task.isCancelled else { return }
+      guard !Task.isCancelled, activity?.id == operationID else { return }
       activity?.phase = result.authorizationCancelled ? .cancelled : .completed
       activity?.completed = result.authorizationCancelled
         ? result.completed.count : request.items.count
@@ -451,6 +459,7 @@ final class MaintenanceStore: ObservableObject {
     authorize: Bool
   ) {
     cancelCurrentOperation()
+    let operationID = UUID()
     let loginEntries = loginConfigurations.map { configuration in
       ActivityEntry(
         id: configuration.id,
@@ -461,7 +470,7 @@ final class MaintenanceStore: ObservableObject {
       )
     }
     activity = MaintenanceActivity(
-      id: UUID(),
+      id: operationID,
       tool: .applications,
       operation: .cleanup,
       title: title,
@@ -485,12 +494,12 @@ final class MaintenanceStore: ObservableObject {
 
     let startupService = StartupItemService()
     operationTask = Task { [weak self, service] in
-      guard let self else { return }
+      guard let self, !Task.isCancelled, activity?.id == operationID else { return }
       let preflightFailures = await service.preflightCleanup(
         items: items,
         allowedRoots: roots
       )
-      guard !Task.isCancelled else { return }
+      guard !Task.isCancelled, activity?.id == operationID else { return }
       if !preflightFailures.isEmpty {
         for failure in preflightFailures {
           markActivityEntry(
@@ -509,10 +518,11 @@ final class MaintenanceStore: ObservableObject {
       var completedStartupConfigurationIDs = Set<ApplicationStartupConfiguration.ID>()
       var startupFailureCount = 0
       for configuration in loginConfigurations {
-        guard !Task.isCancelled, let loginItem = configuration.loginItem else { continue }
+        guard !Task.isCancelled, activity?.id == operationID else { return }
+        guard let loginItem = configuration.loginItem else { continue }
         markActivityEntry(id: configuration.id, state: .working, detail: "")
         let result = await startupService.removeLoginItem(loginItem)
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, activity?.id == operationID else { return }
         switch result {
         case .success:
           completedStartupConfigurationIDs.insert(configuration.id)
@@ -542,9 +552,11 @@ final class MaintenanceStore: ObservableObject {
         allowedRoots: roots,
         authorize: authorize
       ) { [weak self] progress in
-        await self?.updateApplicationCleanupProgress(progress, offset: offset)
+        await self?.updateApplicationCleanupProgress(
+          progress, offset: offset, operationID: operationID
+        )
       }
-      guard !Task.isCancelled else { return }
+      guard !Task.isCancelled, activity?.id == operationID else { return }
 
       let completedFileIDs = Set(result.completed.map(\.id))
       for configuration in startupConfigurations {
@@ -558,6 +570,7 @@ final class MaintenanceStore: ObservableObject {
 
       if !result.authorizationCancelled {
         let verification = await startupService.scan()
+        guard !Task.isCancelled, activity?.id == operationID else { return }
         if case .available = verification.loginItemsAccess {
           for configuration in loginConfigurations
           where completedStartupConfigurationIDs.contains(configuration.id) {
@@ -624,9 +637,10 @@ final class MaintenanceStore: ObservableObject {
 
   private func updateApplicationCleanupProgress(
     _ progress: CleanupProgress,
-    offset: Int
+    offset: Int,
+    operationID: UUID
   ) {
-    guard activity?.phase == .working else { return }
+    guard activity?.id == operationID, activity?.phase == .working else { return }
     activity?.completed = offset + progress.completed
     activity?.total = offset + progress.total
     activity?.currentPath = progress.item.url.path
@@ -647,8 +661,8 @@ final class MaintenanceStore: ObservableObject {
     activity?.entries[index].detail = detail
   }
 
-  private func updateCleanupProgress(_ progress: CleanupProgress) {
-    guard activity?.phase == .working else { return }
+  private func updateCleanupProgress(_ progress: CleanupProgress, operationID: UUID) {
+    guard activity?.id == operationID, activity?.phase == .working else { return }
     activity?.completed = progress.completed
     activity?.total = progress.total
     activity?.currentPath = progress.item.url.path
