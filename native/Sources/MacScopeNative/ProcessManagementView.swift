@@ -3,16 +3,9 @@ import Combine
 import Darwin
 import SwiftUI
 
-private enum ProcessCommand: Identifiable {
+private enum ProcessCommand {
   case quit(ProcessRow)
   case forceQuit(ProcessRow)
-
-  var id: String {
-    switch self {
-    case .quit(let process): "quit-\(process.pid)"
-    case .forceQuit(let process): "force-\(process.pid)"
-    }
-  }
 
   var process: ProcessRow {
     switch self {
@@ -27,14 +20,15 @@ private enum ProcessCommand: Identifiable {
     }
   }
 
-  var title: String {
-    switch self {
-    case .quit(let process): "Quit \(process.name)?"
-    case .forceQuit(let process): "Force Quit \(process.name)?"
+  func title(language: AppLanguage) -> String {
+    let key = switch self {
+    case .quit: "Quit %@?"
+    case .forceQuit: "Force Quit %@?"
     }
+    return AppLocalization.string(key, language: language, arguments: [process.name])
   }
 
-  var actionTitle: String {
+  var actionTitle: LocalizedStringKey {
     switch self {
     case .quit: "Quit"
     case .forceQuit: "Force Quit"
@@ -200,15 +194,17 @@ struct ProcessManagementView: View {
     .onDisappear {
       monitor.trackProcess(nil)
     }
-    .alert(item: $pendingCommand) { command in
-      Alert(
-        title: Text(command.title),
-        message: Text("PID \(command.process.pid)"),
-        primaryButton: .destructive(Text(command.actionTitle)) {
-          operationError = monitor.send(signal: command.signal, to: command.process)
-        },
-        secondaryButton: .cancel()
-      )
+    .alert(
+      pendingCommand?.title(language: settings.language) ?? "",
+      isPresented: commandPresentation,
+      presenting: pendingCommand
+    ) { command in
+      Button(command.actionTitle, role: .destructive) {
+        operationError = monitor.send(signal: command.signal, to: command.process)
+      }
+      Button("Cancel", role: .cancel) { }
+    } message: { command in
+      Text("PID \(command.process.pid)")
     }
     .alert(
       "The process could not be managed",
@@ -221,6 +217,13 @@ struct ProcessManagementView: View {
     } message: {
       Text(operationError ?? "")
     }
+  }
+
+  private var commandPresentation: Binding<Bool> {
+    Binding(
+      get: { pendingCommand != nil },
+      set: { if !$0 { pendingCommand = nil } }
+    )
   }
 
   @ViewBuilder

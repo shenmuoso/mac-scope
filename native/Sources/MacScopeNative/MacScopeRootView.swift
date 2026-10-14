@@ -52,7 +52,10 @@ struct MacScopeRootView: View {
       .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
     } detail: {
       detailContent
-        .navigationTitle(navigation.destination.title)
+        .navigationTitle(Text(verbatim: AppLocalization.string(
+          navigation.destination.titleKey,
+          language: settings.language
+        )))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appDetailBackground()
     }

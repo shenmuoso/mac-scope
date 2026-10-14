@@ -22,6 +22,10 @@ enum AppDestination: String, CaseIterable, Identifiable, Sendable {
   var id: String { rawValue }
 
   var title: LocalizedStringKey {
+    LocalizedStringKey(titleKey)
+  }
+
+  var titleKey: String {
     switch self {
     case .overview: "Overview"
     case .performancePower: "Performance & Power"

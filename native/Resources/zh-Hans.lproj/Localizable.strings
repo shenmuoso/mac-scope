@@ -124,6 +124,9 @@
 "Show Process Info" = "显示进程信息";
 "Process Actions" = "进程操作";
 "Quit Process" = "退出进程";
+"Quit" = "退出";
+"Quit %@?" = "退出 %@？";
+"Force Quit %@?" = "强制退出 %@？";
 "Force Quit" = "强制退出";
 "The process could not be managed" = "无法管理该进程";
 "Select a process to view its activity." = "选择进程以查看活动。";

@@ -117,6 +117,9 @@
 "Show Process Info" = "Show Process Info";
 "Process Actions" = "Process Actions";
 "Quit Process" = "Quit Process";
+"Quit" = "Quit";
+"Quit %@?" = "Quit %@?";
+"Force Quit %@?" = "Force Quit %@?";
 "Force Quit" = "Force Quit";
 "The process could not be managed" = "The process could not be managed";
 "Select a process to view its activity." = "Select a process to view its activity.";

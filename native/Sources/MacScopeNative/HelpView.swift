@@ -11,6 +11,10 @@ private enum HelpTopic: String, CaseIterable, Identifiable {
   var id: String { rawValue }
 
   var title: LocalizedStringKey {
+    LocalizedStringKey(titleKey)
+  }
+
+  var titleKey: String {
     switch self {
     case .overview: "Getting Started"
     case .processes: "Process Management"
@@ -54,7 +58,10 @@ struct HelpView: View {
       .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 220)
     } detail: {
       topicContent(selection ?? .overview)
-        .navigationTitle((selection ?? .overview).title)
+        .navigationTitle(Text(verbatim: AppLocalization.string(
+          (selection ?? .overview).titleKey,
+          language: settings.language
+        )))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appDetailBackground()
     }

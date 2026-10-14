@@ -12,6 +12,10 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
   var id: String { rawValue }
 
   var title: LocalizedStringKey {
+    LocalizedStringKey(titleKey)
+  }
+
+  var titleKey: String {
     switch self {
     case .general: "General"
     case .menuBar: "Menu Bar"
@@ -107,7 +111,10 @@ struct SettingsView: View {
         .frame(maxWidth: DetailLayout.readingWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appDetailBackground()
-        .navigationTitle(activePane.title)
+        .navigationTitle(Text(verbatim: AppLocalization.string(
+          activePane.titleKey,
+          language: settings.language
+        )))
     }
     .navigationSplitViewStyle(.balanced)
     .appSplitWindowStyle()
