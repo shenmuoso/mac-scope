@@ -25,14 +25,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.1-1677ff" alt="版本 0.5.1">
+  <img src="https://img.shields.io/badge/version-0.5.2-1677ff" alt="版本 0.5.2">
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI%20%2B%20AppKit-Native-f05138?logo=swift" alt="SwiftUI 與 AppKit">
   <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="應用程式語言：英文與簡體中文">
 </p>
 
 > [!TIP]
-> **0.5.1：選單列看板最佳化與維護穩定性改善。** 看板採用系統字體、更清楚的文字層級與緊湊配置；視窗標題與程序確認對話框隨語言切換，清理選取控制項補上輔助使用標籤，已取消工作的回呼不會覆蓋新工作的狀態。
+> **0.5.2：系統音量與應用音量。** 可以調節預設輸入輸出音量，並在 macOS 14.2 及以上單獨調節正在播放的應用音量。選單列看板可開啟總音量與應用音量控制。概覽頁左右卡片已對齊高度。
 
 MacScope 將 Mac 最值得關注的狀態集中在清楚的原生介面中。以 SwiftUI 與 AppKit 建構，不含 Electron、內嵌瀏覽器或額外執行環境；不需要終端機、Python 或 Homebrew，安裝後即可使用。
 
@@ -317,7 +317,7 @@ native/scripts/build_dmg.sh release
 預設輸出：
 
 ```text
-native/build/MacScope-0.5.1.dmg
+native/build/MacScope-0.5.2.dmg
 ```
 
 儲存庫保留早期 Python/Textual 終端版本，供相容性與歷史參考；它不是原生應用程式的執行相依項目。

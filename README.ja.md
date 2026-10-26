@@ -25,14 +25,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.1-1677ff" alt="バージョン 0.5.1">
+  <img src="https://img.shields.io/badge/version-0.5.2-1677ff" alt="バージョン 0.5.2">
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/SwiftUI%20%2B%20AppKit-Native-f05138?logo=swift" alt="SwiftUI と AppKit">
   <img src="https://img.shields.io/badge/language-English%20%7C%20简体中文-34c759" alt="アプリの表示言語：英語・簡体字中国語">
 </p>
 
 > [!TIP]
-> **0.5.1：メニューバーダッシュボードの改善とメンテナンスの安定性向上。** システムフォント、明確な文字の階層、コンパクトなレイアウトを採用。ウインドウのタイトルとプロセス操作の確認ダイアログが選択した言語に追従し、クリーンアップの選択項目にアクセシビリティラベルを追加しました。キャンセル済みの処理のコールバックが新しいタスクの状態を上書きしないように修正しています。
+> **0.5.2：システム音量とアプリごとの音量。** デフォルトの入出力音量を調整でき、macOS 14.2 以降では再生中のアプリ音量も個別に調整できます。メニューバーダッシュボードではシステム音量とアプリ音量を表示できます。概要の左右カードの高さを揃えました。
 
 MacScope は、Mac の重要な状態を見やすいネイティブ UI にまとめます。SwiftUI と AppKit で構築され、Electron、組み込みブラウザ、追加のランタイムは含みません。利用にターミナル、Python、Homebrew は不要です。
 
@@ -317,7 +317,7 @@ native/scripts/build_dmg.sh release
 標準の出力先：
 
 ```text
-native/build/MacScope-0.5.1.dmg
+native/build/MacScope-0.5.2.dmg
 ```
 
 以前の Python/Textual ターミナル版は互換性と履歴参照のためリポジトリに残していますが、ネイティブアプリの実行には不要です。
