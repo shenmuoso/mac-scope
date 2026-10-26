@@ -17,6 +17,7 @@ struct MacScopeNativeApp: App {
         .environmentObject(runtime.navigation)
         .environmentObject(runtime.updateChecker)
         .environmentObject(runtime.fanControl)
+        .environmentObject(runtime.audio)
         .environment(\.locale, runtime.settings.language.locale)
         .tint(runtime.settings.activeTheme.accentColor)
         .frame(minWidth: 1_020, minHeight: 620)

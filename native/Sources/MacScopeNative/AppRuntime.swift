@@ -10,6 +10,7 @@ final class AppRuntime: ObservableObject {
   let navigation: AppNavigation
   let updateChecker: UpdateChecker
   let fanControl: FanControlManager
+  let audio: AppAudioController
   let iconController: AppIconController
 
   private let appearanceController: AppAppearanceController
@@ -29,6 +30,7 @@ final class AppRuntime: ObservableObject {
     navigation = AppNavigation()
     updateChecker = UpdateChecker()
     fanControl = FanControlManager()
+    audio = AppAudioController()
 
     let sceneSettingsChanges: [AnyPublisher<Void, Never>] = [
       settings.$language.removeDuplicates().dropFirst().map { _ in () }.eraseToAnyPublisher(),
@@ -91,7 +93,8 @@ final class AppRuntime: ObservableObject {
     let menuBarController = MenuBarController(
       monitor: monitor,
       settings: settings,
-      navigation: navigation
+      navigation: navigation,
+      audio: audio
     )
     if let openMainWindowHandler {
       menuBarController.setOpenMainWindowHandler(openMainWindowHandler)
@@ -99,6 +102,7 @@ final class AppRuntime: ObservableObject {
     self.menuBarController = menuBarController
     monitor.updateRefreshInterval(settings.refreshInterval)
     monitor.start()
+    audio.start()
     maintenance.updateLanguage(settings.language)
     applyDockIconVisibility(settings.dockIconVisible)
     updateChecker.checkOnLaunch()
@@ -179,23 +183,26 @@ final class AppRuntime: ObservableObject {
 
   private func bindFanControlSafetyEvents() {
     NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
-      .sink { [weak fanControl] _ in
+      .sink { [weak fanControl, weak audio] _ in
         fanControl?.prepareForApplicationExit()
+        audio?.prepareForApplicationExit()
       }
       .store(in: &cancellables)
 
     NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
-      .sink { [weak fanControl] _ in
+      .sink { [weak fanControl, weak audio] _ in
         Task { @MainActor in
           fanControl?.prepareForSleep()
+          audio?.prepareForSleep()
         }
       }
       .store(in: &cancellables)
 
     NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
-      .sink { [weak fanControl] _ in
+      .sink { [weak fanControl, weak audio] _ in
         Task { @MainActor in
           fanControl?.resumeAfterWake()
+          audio?.resumeAfterWake()
         }
       }
       .store(in: &cancellables)

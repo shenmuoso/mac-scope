@@ -7,6 +7,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
   private let monitor: SystemMonitor
   private let settings: AppSettings
   private let navigation: AppNavigation
+  private let audio: AppAudioController
   private let panel = MenuBarDashboardPanel()
   private let hostingController = NSHostingController(rootView: AnyView(EmptyView()))
 
@@ -23,11 +24,13 @@ final class MenuBarController: NSObject, NSWindowDelegate {
   init(
     monitor: SystemMonitor,
     settings: AppSettings,
-    navigation: AppNavigation
+    navigation: AppNavigation,
+    audio: AppAudioController
   ) {
     self.monitor = monitor
     self.settings = settings
     self.navigation = navigation
+    self.audio = audio
     super.init()
 
     hostingController.sizingOptions = [.intrinsicContentSize, .preferredContentSize]
@@ -89,6 +92,13 @@ final class MenuBarController: NSObject, NSWindowDelegate {
       settings.$menuBarModules.removeDuplicates().dropFirst().map { _ in () }
         .eraseToAnyPublisher(),
       settings.$menuBarProcessLimit.removeDuplicates().dropFirst().map { _ in () }
+        .eraseToAnyPublisher(),
+      audio.$apps
+        .map(\.count)
+        .removeDuplicates()
+        .dropFirst()
+        .filter { [weak settings] _ in settings?.menuBarModules.contains(.appVolume) == true }
+        .map { _ in () }
         .eraseToAnyPublisher(),
     ]
     Publishers.MergeMany(dashboardChanges)
@@ -276,6 +286,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
       .environmentObject(monitor.metrics)
       .environmentObject(settings)
       .environmentObject(navigation)
+      .environmentObject(audio)
       .environment(\.locale, settings.language.locale)
       .tint(settings.activeTheme.accentColor)
     )
@@ -288,6 +299,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     panel.setContentSize(MenuBarDashboardView.contentSize(
       modules: settings.menuBarModules,
       processLimit: settings.menuBarProcessLimit,
+      appCount: AppAudioRoute.isPerAppSupported ? audio.apps.count : 0,
       maximumHeight: (statusItem?.button?.window?.screen?.visibleFrame.height ?? 800) - 20
     ))
   }

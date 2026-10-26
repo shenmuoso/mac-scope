@@ -121,5 +121,32 @@ struct PowerMetricsReaderTests {
     #expect(!settings.menuBarModules.contains(.systemPower))
     #expect(!settings.menuBarModules.contains(.chargingPower))
     #expect(!settings.menuBarModules.contains(.fan))
+    #expect(!settings.menuBarModules.contains(.appVolume))
+  }
+
+  @Test("App volume rows increase the menu bar dashboard height")
+  @MainActor
+  func appVolumeSectionChangesDashboardHeight() {
+    let without = MenuBarDashboardView.contentSize(
+      modules: [.cpu],
+      processLimit: 5,
+      appCount: 3,
+      maximumHeight: 800
+    )
+    let empty = MenuBarDashboardView.contentSize(
+      modules: [.cpu, .appVolume],
+      processLimit: 5,
+      appCount: 0,
+      maximumHeight: 800
+    )
+    let three = MenuBarDashboardView.contentSize(
+      modules: [.cpu, .appVolume],
+      processLimit: 5,
+      appCount: 3,
+      maximumHeight: 800
+    )
+
+    #expect(empty.height > without.height)
+    #expect(three.height - empty.height == MenuBarDashboardLayout.volumeRowHeight * 2)
   }
 }

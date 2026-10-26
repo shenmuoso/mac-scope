@@ -28,6 +28,7 @@ struct MacScopeRootView: View {
           Section("Hardware") {
             sidebarRow(.systemInfo)
             sidebarRow(.displays)
+            sidebarRow(.audio)
             sidebarRow(.battery)
           }
           Section("System Tools") {
@@ -154,6 +155,8 @@ struct MacScopeRootView: View {
       HardwareInfoView()
     case .displays:
       DisplayControlView()
+    case .audio:
+      AudioControlView()
     case .battery:
       BatteryHealthView()
     case .ports:

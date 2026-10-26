@@ -9,6 +9,7 @@ enum MenuBarDashboardLayout {
   static let metricRowHeight: CGFloat = 64
   static let processHeaderHeight: CGFloat = 34
   static let processRowHeight: CGFloat = 30
+  static let volumeRowHeight: CGFloat = 36
   static let iconSize: CGFloat = 26
   static let actionSize: CGFloat = 24
   static let sparklineWidth: CGFloat = 64

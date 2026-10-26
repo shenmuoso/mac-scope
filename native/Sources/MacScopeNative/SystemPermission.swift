@@ -34,6 +34,16 @@ enum SystemPermission {
   }
 
   @MainActor
+  static func openSystemAudioSettings() {
+    guard
+      let url = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture"
+      )
+    else { return }
+    NSWorkspace.shared.open(url)
+  }
+
+  @MainActor
   static func openAutomationSettings() {
     guard
       let url = URL(

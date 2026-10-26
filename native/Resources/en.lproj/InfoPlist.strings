@@ -1,1 +1,2 @@
 "NSAppleEventsUsageDescription" = "MacScope uses System Events to show and manage the applications configured to open when you log in.";
+"NSAudioCaptureUsageDescription" = "MacScope adjusts the volume of individual applications by receiving their audio while a custom level is active. Audio stays on this Mac.";

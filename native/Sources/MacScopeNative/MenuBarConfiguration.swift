@@ -60,8 +60,13 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
   case chargingPower
   case fan
   case processes
+  case appVolume
 
   var id: String { rawValue }
+
+  var isDedicatedSection: Bool {
+    self == .processes || self == .appVolume
+  }
 
   var title: String {
     switch self {
@@ -75,6 +80,7 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
     case .chargingPower: "Charging Power"
     case .fan: "Fan Speed"
     case .processes: "Top Processes"
+    case .appVolume: "App Volume"
     }
   }
 
@@ -90,6 +96,7 @@ enum MenuBarModule: String, CaseIterable, Identifiable, Sendable {
     case .chargingPower: "battery.100percent.bolt"
     case .fan: "fan"
     case .processes: "list.number"
+    case .appVolume: "speaker.wave.2"
     }
   }
 }

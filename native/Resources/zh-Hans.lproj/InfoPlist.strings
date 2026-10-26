@@ -1,1 +1,2 @@
 "NSAppleEventsUsageDescription" = "MacScope 需要使用“系统事件”来显示和管理登录时自动打开的应用。";
+"NSAudioCaptureUsageDescription" = "在单独调节某个应用的音量时，MacScope 需要接收该应用的音频。音频只在这台 Mac 上处理。";

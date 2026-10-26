@@ -21,6 +21,8 @@ let package = Package(
     .executableTarget(
       name: "MacScopeNative",
       linkerSettings: [
+        .linkedFramework("AudioToolbox"),
+        .linkedFramework("CoreAudio"),
         .linkedFramework("CoreWLAN"),
         .linkedFramework("IOKit"),
         .linkedFramework("Security"),

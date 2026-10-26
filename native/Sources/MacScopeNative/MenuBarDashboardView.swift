@@ -7,6 +7,7 @@ struct MenuBarDashboardView: View {
   @EnvironmentObject private var metrics: SystemMetricsStore
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
+  @EnvironmentObject private var audio: AppAudioController
 
   var maximumHeight: CGFloat = 650
   let openMainWindow: () -> Void
@@ -25,7 +26,7 @@ struct MenuBarDashboardView: View {
             module in
             moduleView(module)
             if index < modules.count - 1,
-              module == .processes || modules[index + 1] == .processes
+              module.isDedicatedSection || modules[index + 1].isDedicatedSection
             {
               Divider()
                 .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
@@ -43,6 +44,7 @@ struct MenuBarDashboardView: View {
     .frame(width: MenuBarDashboardLayout.width, height: Self.contentSize(
       modules: modules,
       processLimit: settings.menuBarProcessLimit,
+      appCount: AppAudioRoute.isPerAppSupported ? audio.apps.count : 0,
       maximumHeight: maximumHeight
     ).height)
   }
@@ -50,20 +52,27 @@ struct MenuBarDashboardView: View {
   static func contentSize(
     modules: [MenuBarModule],
     processLimit: Int,
+    appCount: Int = 0,
     maximumHeight: CGFloat
   ) -> NSSize {
-    let metricCount = modules.filter { $0 != .processes }.count
+    let metricCount = modules.filter { !$0.isDedicatedSection }.count
     let processHeight =
       modules.contains(.processes)
       ? MenuBarDashboardLayout.processHeaderHeight
         + CGFloat(processLimit) * MenuBarDashboardLayout.processRowHeight
       : 0
+    let volumeRowCount = modules.contains(.appVolume) ? 1 + max(appCount, 1) : 0
+    let volumeHeight =
+      modules.contains(.appVolume)
+      ? MenuBarDashboardLayout.processHeaderHeight
+        + CGFloat(volumeRowCount) * MenuBarDashboardLayout.volumeRowHeight
+      : 0
     let sectionDividerCount = zip(modules, modules.dropFirst()).count {
-      $0.0 == .processes || $0.1 == .processes
+      $0.0.isDedicatedSection || $0.1.isDedicatedSection
     }
     let contentHeight = MenuBarDashboardLayout.headerHeight + MenuBarDashboardLayout.footerHeight
       + MenuBarDashboardLayout.contentInset * 2 + 2 + CGFloat(sectionDividerCount)
-      + CGFloat(metricCount) * MenuBarDashboardLayout.metricRowHeight + processHeight
+      + CGFloat(metricCount) * MenuBarDashboardLayout.metricRowHeight + processHeight + volumeHeight
     let height = min(maximumHeight, min(650, max(140, contentHeight)))
     return NSSize(width: MenuBarDashboardLayout.width, height: height)
   }
@@ -122,9 +131,12 @@ struct MenuBarDashboardView: View {
 
   @ViewBuilder
   private func moduleView(_ module: MenuBarModule) -> some View {
-    if module == .processes {
+    switch module {
+    case .processes:
       MenuBarProcessesView(onSelect: openProcess)
-    } else {
+    case .appVolume:
+      MenuBarVolumeSection()
+    default:
       MenuBarMetricRow(module: module)
     }
   }
@@ -341,8 +353,8 @@ private struct MenuBarMetricRow: View {
         progress: nil,
         progressColor: .clear
       )
-    case .processes:
-      preconditionFailure("Processes use a dedicated module view")
+    case .processes, .appVolume:
+      preconditionFailure("Dedicated modules use their own views")
     }
   }
 
@@ -456,7 +468,7 @@ private struct MetricSparkline: View {
         value = point.chargingPowerWatts
       case .fan:
         value = point.fanReadings.map(\.rpm).max()
-      case .processes:
+      case .processes, .appVolume:
         value = nil
       }
       return value.map { MetricSparkPoint(timestamp: point.timestamp, value: $0) }
@@ -479,7 +491,7 @@ private struct MetricSparkline: View {
       let maximum = values.max() ?? minimum + 1
       let padding = max(2, (maximum - minimum) * 0.2)
       return (minimum - padding)...(maximum + padding)
-    case .processes:
+    case .processes, .appVolume:
       return 0...1
     }
   }
@@ -597,5 +609,172 @@ private struct MenuBarProcessRow: View {
     .buttonStyle(.plain)
     .onHover { isHovered = $0 }
     .help("Show Process Info")
+  }
+}
+
+private struct MenuBarVolumeSection: View {
+  @EnvironmentObject private var controller: AppAudioController
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack {
+        Label("App Volume", systemImage: "speaker.wave.2")
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Spacer()
+      }
+      .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+      .frame(height: MenuBarDashboardLayout.processHeaderHeight)
+
+      MenuBarVolumeRow(
+        title: Text("System Volume"),
+        icon: .symbol(outputSymbol),
+        volume: controller.output.volume,
+        isMuted: controller.output.isMuted,
+        isEnabled: controller.output.canChangeVolume,
+        target: .system
+      )
+
+      if AppAudioRoute.isPerAppSupported {
+        if controller.apps.isEmpty {
+          Text("No Application Audio")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+            .frame(height: MenuBarDashboardLayout.volumeRowHeight)
+        } else {
+          ForEach(controller.apps) { row in
+            MenuBarVolumeRow(
+              title: Text(verbatim: row.name),
+              icon: .application(icon(for: row)),
+              volume: row.level.volume,
+              isMuted: row.level.isMuted,
+              isEnabled: true,
+              target: .app(row.key)
+            )
+          }
+        }
+      } else {
+        Text("Per-app Volume Unavailable")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+          .frame(height: MenuBarDashboardLayout.volumeRowHeight)
+      }
+    }
+  }
+
+  private var outputSymbol: String {
+    guard let device = controller.outputDevices.first(where: { $0.uid == controller.output.deviceUID })
+    else { return "speaker.wave.2" }
+    return AppAudioDeviceSymbol.systemImage(name: device.name, transport: device.transport)
+  }
+
+  private func icon(for row: AppAudioRow) -> NSImage {
+    if let path = row.bundlePath {
+      return WorkspaceIconCache.icon(for: URL(fileURLWithPath: path))
+    }
+    return NSImage(named: NSImage.applicationIconName) ?? NSImage()
+  }
+}
+
+private struct MenuBarVolumeRow: View {
+  enum Icon {
+    case symbol(String)
+    case application(NSImage)
+  }
+
+  enum Target {
+    case system
+    case app(String)
+  }
+
+  @EnvironmentObject private var controller: AppAudioController
+
+  let title: Text
+  let icon: Icon
+  let volume: Double
+  let isMuted: Bool
+  let isEnabled: Bool
+  let target: Target
+
+  var body: some View {
+    HStack(spacing: 8) {
+      iconView
+      title
+        .font(.subheadline)
+        .lineLimit(1)
+        .frame(maxWidth: 108, alignment: .leading)
+      Button {
+        setMuted(!isMuted)
+      } label: {
+        Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+          .frame(width: 16, height: 16)
+      }
+      .buttonStyle(.borderless)
+      .disabled(!isEnabled)
+      .help(isMuted ? Text("Unmute") : Text("Mute"))
+      .accessibilityLabel(isMuted ? Text("Unmute") : Text("Mute"))
+      Slider(
+        value: Binding(get: { volume }, set: setVolume),
+        in: 0...1,
+        onEditingChanged: onEditingChanged
+      )
+      .controlSize(.small)
+      .disabled(!isEnabled)
+      Text(percent)
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .frame(width: 36, alignment: .trailing)
+    }
+    .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
+    .frame(height: MenuBarDashboardLayout.volumeRowHeight)
+    .accessibilityElement(children: .combine)
+  }
+
+  @ViewBuilder
+  private var iconView: some View {
+    switch icon {
+    case .symbol(let name):
+      Image(systemName: name)
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(.secondary)
+        .frame(width: 16, height: 16)
+    case .application(let image):
+      Image(nsImage: image)
+        .resizable()
+        .frame(width: 16, height: 16)
+    }
+  }
+
+  private var percent: String {
+    "\(Int((min(1, max(0, volume)) * 100).rounded()))%"
+  }
+
+  private func setVolume(_ volume: Double) {
+    switch target {
+    case .system:
+      controller.setOutputVolume(volume)
+    case .app(let key):
+      controller.setVolume(volume, for: key)
+    }
+  }
+
+  private func setMuted(_ isMuted: Bool) {
+    switch target {
+    case .system:
+      controller.setOutputMuted(isMuted)
+    case .app(let key):
+      controller.setMuted(isMuted, for: key)
+    }
+  }
+
+  private func onEditingChanged(_ isEditing: Bool) {
+    if case .system = target {
+      controller.setOutputEditing(isEditing)
+    }
   }
 }

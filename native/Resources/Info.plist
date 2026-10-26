@@ -39,5 +39,7 @@
     <string>NSApplication</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>MacScope uses System Events to show and manage the applications configured to open when you log in.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>MacScope adjusts the volume of individual applications by receiving their audio while a custom level is active. Audio stays on this Mac.</string>
 </dict>
 </plist>
