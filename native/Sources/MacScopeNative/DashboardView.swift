@@ -41,12 +41,9 @@ struct DashboardView: View {
   }
 
   private var overviewContent: some View {
-    HStack(alignment: .top, spacing: 16) {
+    EqualHeightColumns(spacing: 16, leadingWidth: 250) {
       metricColumn
-        .frame(width: 250)
-
       activityTrends
-        .frame(maxWidth: .infinity)
     }
   }
 
@@ -129,6 +126,7 @@ struct DashboardView: View {
         )
       )
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .detailGroup(inset: 0)
   }
 
@@ -181,6 +179,7 @@ struct DashboardView: View {
         collectingView
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .detailGroup(inset: 0)
   }
 
@@ -254,7 +253,7 @@ struct DashboardView: View {
       .chartYAxis(.hidden)
       .chartXScale(domain: historyDomain)
       .chartYScale(domain: 0...100)
-      .frame(height: 96)
+      .frame(minHeight: 96, idealHeight: 96, maxHeight: .infinity)
       .transaction { $0.animation = nil }
       .chartOverlay { proxy in
         chartHoverOverlay(proxy: proxy)
@@ -316,7 +315,7 @@ struct DashboardView: View {
       .chartYAxis(.hidden)
       .chartXScale(domain: historyDomain)
       .chartYScale(domain: diskRateDomain)
-      .frame(height: 82)
+      .frame(minHeight: 82, idealHeight: 82, maxHeight: .infinity)
       .transaction { $0.animation = nil }
       .chartOverlay { proxy in
         chartHoverOverlay(proxy: proxy)
@@ -378,7 +377,7 @@ struct DashboardView: View {
       .chartYAxis(.hidden)
       .chartXScale(domain: historyDomain)
       .chartYScale(domain: networkRateDomain)
-      .frame(height: 82)
+      .frame(minHeight: 82, idealHeight: 82, maxHeight: .infinity)
       .transaction { $0.animation = nil }
       .chartOverlay { proxy in
         chartHoverOverlay(proxy: proxy)
@@ -516,7 +515,7 @@ private struct OverviewMetricRow: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .padding(.horizontal, 16)
-    .frame(height: 110)
+    .frame(minHeight: 110, idealHeight: 110, maxHeight: .infinity)
     .accessibilityElement(children: .combine)
   }
 }
@@ -576,6 +575,40 @@ private struct OverviewMetricDial: View {
     }
     .frame(width: 60, height: 60)
     .accessibilityHidden(true)
+  }
+}
+
+private struct EqualHeightColumns: Layout {
+  var spacing: CGFloat
+  var leadingWidth: CGFloat
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+    let width = proposal.width ?? leadingWidth
+    let sizes = idealSizes(width: width, subviews: subviews)
+    return CGSize(width: width, height: sizes.map(\.height).max() ?? 0)
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    let trailingWidth = max(0, bounds.width - leadingWidth - spacing)
+    var x = bounds.minX
+    for index in subviews.indices {
+      let width = index == 0 ? leadingWidth : trailingWidth
+      subviews[index].place(
+        at: CGPoint(x: x, y: bounds.minY),
+        anchor: .topLeading,
+        proposal: ProposedViewSize(width: width, height: bounds.height)
+      )
+      x += width + spacing
+    }
+  }
+
+  private func idealSizes(width: CGFloat, subviews: Subviews) -> [CGSize] {
+    let trailingWidth = max(0, width - leadingWidth - spacing)
+    return subviews.enumerated().map { index, subview in
+      subview.sizeThatFits(
+        ProposedViewSize(width: index == 0 ? leadingWidth : trailingWidth, height: nil)
+      )
+    }
   }
 }
 
