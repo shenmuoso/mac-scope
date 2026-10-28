@@ -59,6 +59,7 @@ struct SettingsView: View {
 
   @StateObject private var permissionManager = PermissionManager()
   @AppStorage("native.settingsTab") private var selectedTab = "general"
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var selectedScanFolder: String?
   @State private var confirmsReset = false
 
@@ -71,7 +72,13 @@ struct SettingsView: View {
       get: { selectedTab },
       set: { value in
         if let value, SettingsPane(rawValue: value) != nil {
-          selectedTab = value
+          if reduceMotion {
+            selectedTab = value
+          } else {
+            withAnimation(.easeInOut(duration: 0.2)) {
+              selectedTab = value
+            }
+          }
         }
       }
     )
@@ -108,6 +115,7 @@ struct SettingsView: View {
       .navigationSplitViewColumnWidth(min: 180, ideal: 205, max: 230)
     } detail: {
       settingsDetail
+        .pageTransition(activePane)
         .frame(maxWidth: DetailLayout.readingWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .appDetailBackground()
@@ -497,7 +505,12 @@ struct SettingsView: View {
     }
     .formStyle(.grouped)
     .padding(8)
-    .onAppear(perform: permissionManager.refresh)
+    .onAppear {
+      Task { @MainActor in
+        await Task.yield()
+        permissionManager.refresh()
+      }
+    }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) {
       _ in permissionManager.refresh()
     }

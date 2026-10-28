@@ -193,9 +193,10 @@ enum AppAudioOwningApp {
   }
 
   static func groupKey(for process: AudioProcessSnapshot) -> String {
-    if let executablePath = process.executablePath,
-      let appPath = applicationPath(executablePath: executablePath)
-    {
+    if let appPath = resolvedApplicationPath(
+      executablePath: process.executablePath,
+      bundleID: process.bundleID
+    ) {
       if let identifier = bundleIdentifier(appPath: appPath) {
         return identifier
       }
@@ -203,6 +204,27 @@ enum AppAudioOwningApp {
     }
     return AppAudioCatalog.key(bundleID: process.bundleID, pid: process.pid)
   }
+
+  /// System audio servers that play on behalf of a user-facing app.
+  static func resolvedApplicationPath(executablePath: String?, bundleID: String?) -> String? {
+    if let executablePath, let nested = applicationPath(executablePath: executablePath) {
+      return nested
+    }
+    let names = [bundleID, executablePath.map { URL(fileURLWithPath: $0).lastPathComponent }]
+      .compactMap { $0 }
+    for name in names {
+      guard let appPath = knownApplications[name], FileManager.default.fileExists(atPath: appPath) else {
+        continue
+      }
+      return appPath
+    }
+    return nil
+  }
+
+  private static let knownApplications = [
+    "avconferenced": "/System/Applications/FaceTime.app",
+    "com.apple.avconferenced": "/System/Applications/FaceTime.app",
+  ]
 }
 
 enum AppAudioLevelStore {

@@ -40,9 +40,10 @@ final class CoreAudioAppProcessList: AppAudioProcessListing, @unchecked Sendable
 
 enum AppAudioProcessName {
   static func resolve(_ process: AudioProcessSnapshot) -> (name: String, bundlePath: String?) {
-    if let executablePath = process.executablePath,
-      let appPath = AppAudioOwningApp.applicationPath(executablePath: executablePath)
-    {
+    if let appPath = AppAudioOwningApp.resolvedApplicationPath(
+      executablePath: process.executablePath,
+      bundleID: process.bundleID
+    ) {
       let name = applicationDisplayName(appPath: appPath)
       if !name.isEmpty {
         return (name, appPath)

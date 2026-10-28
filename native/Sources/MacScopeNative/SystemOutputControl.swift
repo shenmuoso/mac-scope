@@ -59,15 +59,18 @@ enum AppAudioDeviceSymbol {
   }
 }
 
-protocol SystemOutputControlling: AnyObject {
+protocol SystemOutputControlling: AnyObject, Sendable {
   func read() -> SystemOutputState
   func outputDevices() -> [AudioOutputDevice]
   func setDefaultDevice(uid: String)
+  func setDefaultDevice(uid: String, objectID: AudioObjectID)
   func setVolume(_ volume: Float)
   func setVolume(_ volume: Float, deviceUID: String)
+  func setVolume(_ volume: Float, deviceID: AudioObjectID, scope: AudioObjectPropertyScope)
   func setMuted(_ muted: Bool)
   func setMuted(_ muted: Bool, deviceUID: String)
   func observe(_ handler: @escaping @Sendable () -> Void)
+  func flushVolumeWrites()
   func readInput() -> SystemOutputState
   func inputDevices() -> [AudioOutputDevice]
   func setDefaultInputDevice(uid: String)
@@ -76,7 +79,14 @@ protocol SystemOutputControlling: AnyObject {
 }
 
 extension SystemOutputControlling {
+  func setDefaultDevice(uid: String, objectID: AudioObjectID) {
+    setDefaultDevice(uid: uid)
+  }
+
+  func flushVolumeWrites() {}
+
   func setVolume(_ volume: Float, deviceUID: String) {}
+  func setVolume(_ volume: Float, deviceID: AudioObjectID, scope: AudioObjectPropertyScope) {}
   func setMuted(_ muted: Bool, deviceUID: String) {}
   func readInput() -> SystemOutputState { .unknown }
   func inputDevices() -> [AudioOutputDevice] { [] }
@@ -86,7 +96,20 @@ extension SystemOutputControlling {
 }
 
 final class SystemOutputControl: SystemOutputControlling, @unchecked Sendable {
+  private struct VolumeWrite {
+    var deviceID: AudioObjectID
+    var scope: AudioObjectPropertyScope
+    var volume: Float
+  }
+
   private let queue = DispatchQueue(label: "com.shenmuoso.macscope.output-volume")
+  /// Hardware volume writes take about 15 ms each. Keep them off the main thread and collapse a drag to the latest value.
+  private let volumeQueue = DispatchQueue(label: "com.shenmuoso.macscope.output-volume-write", qos: .userInteractive)
+  private let volumeLock = NSLock()
+  private var pendingVolumeWrites: [String: VolumeWrite] = [:]
+  private var volumeWriteScheduled = false
+  private var volumeSelectorCache: [String: AudioObjectPropertySelector] = [:]
+  private var lastVolumeWrite = Date.distantPast
   private var deviceListener: AudioObjectPropertyListenerBlock?
 
   func read() -> SystemOutputState {
@@ -108,7 +131,24 @@ final class SystemOutputControl: SystemOutputControlling, @unchecked Sendable {
   }
 
   func setDefaultDevice(uid: String) {
-    setDefaultDevice(uid, selector: kAudioHardwarePropertyDefaultOutputDevice, scope: kAudioDevicePropertyScopeOutput)
+    setDefaultDevice(uid: uid, objectID: kAudioObjectUnknown)
+  }
+
+  func setDefaultDevice(uid: String, objectID: AudioObjectID) {
+    if objectID != kAudioObjectUnknown,
+      CoreAudioProperty.set(
+        UInt32(objectID),
+        selector: kAudioHardwarePropertyDefaultOutputDevice,
+        objectID: AudioObjectID(kAudioObjectSystemObject)
+      )
+    {
+      return
+    }
+    setDefaultDevice(
+      uid,
+      selector: kAudioHardwarePropertyDefaultOutputDevice,
+      scope: kAudioDevicePropertyScopeOutput
+    )
   }
 
   func setDefaultInputDevice(uid: String) {
@@ -121,12 +161,32 @@ final class SystemOutputControl: SystemOutputControlling, @unchecked Sendable {
   }
 
   func setVolume(_ volume: Float, deviceUID: String) {
-    guard let deviceID = deviceID(forUID: deviceUID, scope: kAudioDevicePropertyScopeOutput) else { return }
+    guard let deviceID = deviceID(forUID: deviceUID) else { return }
     setVolume(volume, deviceID: deviceID, scope: kAudioDevicePropertyScopeOutput)
   }
 
+  func setVolume(_ volume: Float, deviceID: AudioObjectID, scope: AudioObjectPropertyScope) {
+    let clamped = min(1, max(0, volume))
+    let key = "\(deviceID)-\(scope)"
+    volumeLock.lock()
+    pendingVolumeWrites[key] = VolumeWrite(deviceID: deviceID, scope: scope, volume: clamped)
+    let schedule = !volumeWriteScheduled
+    if schedule { volumeWriteScheduled = true }
+    volumeLock.unlock()
+    guard schedule else { return }
+    volumeQueue.async { [weak self] in
+      self?.drainVolumeWrites()
+    }
+  }
+
+  func flushVolumeWrites() {
+    volumeQueue.sync {
+      drainVolumeWrites()
+    }
+  }
+
   func setInputVolume(_ volume: Float, deviceUID: String) {
-    guard let deviceID = deviceID(forUID: deviceUID, scope: kAudioDevicePropertyScopeInput) else { return }
+    guard let deviceID = deviceID(forUID: deviceUID) else { return }
     setVolume(volume, deviceID: deviceID, scope: kAudioDevicePropertyScopeInput)
   }
 
@@ -136,12 +196,12 @@ final class SystemOutputControl: SystemOutputControlling, @unchecked Sendable {
   }
 
   func setMuted(_ muted: Bool, deviceUID: String) {
-    guard let deviceID = deviceID(forUID: deviceUID, scope: kAudioDevicePropertyScopeOutput) else { return }
+    guard let deviceID = deviceID(forUID: deviceUID) else { return }
     setMuted(muted, deviceID: deviceID, scope: kAudioDevicePropertyScopeOutput)
   }
 
   func setInputMuted(_ muted: Bool, deviceUID: String) {
-    guard let deviceID = deviceID(forUID: deviceUID, scope: kAudioDevicePropertyScopeInput) else { return }
+    guard let deviceID = deviceID(forUID: deviceUID) else { return }
     setMuted(muted, deviceID: deviceID, scope: kAudioDevicePropertyScopeInput)
   }
 
@@ -231,8 +291,10 @@ final class SystemOutputControl: SystemOutputControlling, @unchecked Sendable {
     )
   }
 
-  private func deviceID(forUID uid: String, scope: AudioObjectPropertyScope) -> AudioObjectID? {
-    devices(scope: scope).first { $0.uid == uid }?.objectID
+  private func deviceID(forUID uid: String) -> AudioObjectID? {
+    CoreAudioProperty.objectIDs(kAudioHardwarePropertyDevices).first { deviceID in
+      CoreAudioProperty.string(kAudioDevicePropertyDeviceUID, objectID: deviceID) == uid
+    }
   }
 
   private func setDefaultDevice(
@@ -240,7 +302,7 @@ final class SystemOutputControl: SystemOutputControlling, @unchecked Sendable {
     selector: AudioObjectPropertySelector,
     scope: AudioObjectPropertyScope
   ) {
-    guard let deviceID = deviceID(forUID: uid, scope: scope) else { return }
+    guard let deviceID = deviceID(forUID: uid) else { return }
     _ = CoreAudioProperty.set(
       UInt32(deviceID),
       selector: selector,
@@ -248,10 +310,43 @@ final class SystemOutputControl: SystemOutputControlling, @unchecked Sendable {
     )
   }
 
-  private func setVolume(_ volume: Float, deviceID: AudioObjectID, scope: AudioObjectPropertyScope) {
-    guard let selector = volumeSelector(for: deviceID, scope: scope) else { return }
-    let clamped = min(1, max(0, volume))
-    _ = CoreAudioProperty.set(clamped, selector: selector, objectID: deviceID, scope: scope)
+  private func drainVolumeWrites() {
+    while true {
+      volumeLock.lock()
+      guard !pendingVolumeWrites.isEmpty else {
+        volumeWriteScheduled = false
+        volumeLock.unlock()
+        return
+      }
+      let earliest = lastVolumeWrite.addingTimeInterval(0.05)
+      if Date() < earliest {
+        let delay = min(0.05, max(0, earliest.timeIntervalSinceNow))
+        volumeLock.unlock()
+        if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+        continue
+      }
+      let batch = pendingVolumeWrites
+      pendingVolumeWrites.removeAll()
+      volumeLock.unlock()
+      for write in batch.values {
+        writeVolume(write.volume, deviceID: write.deviceID, scope: write.scope)
+      }
+      lastVolumeWrite = Date()
+    }
+  }
+
+  private func writeVolume(_ volume: Float, deviceID: AudioObjectID, scope: AudioObjectPropertyScope) {
+    let cacheKey = "\(deviceID)-\(scope)"
+    let selector: AudioObjectPropertySelector
+    if let cached = volumeSelectorCache[cacheKey] {
+      selector = cached
+    } else if let resolved = volumeSelector(for: deviceID, scope: scope) {
+      volumeSelectorCache[cacheKey] = resolved
+      selector = resolved
+    } else {
+      return
+    }
+    _ = CoreAudioProperty.set(volume, selector: selector, objectID: deviceID, scope: scope)
   }
 
   private func setMuted(_ muted: Bool, deviceID: AudioObjectID, scope: AudioObjectPropertyScope) {

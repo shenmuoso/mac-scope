@@ -45,8 +45,11 @@ struct HardwareInfoView: View {
       }
     }
     .onAppear {
-      if store.snapshot == nil {
-        store.refresh()
+      Task { @MainActor in
+        await Task.yield()
+        if store.snapshot == nil {
+          store.refresh()
+        }
       }
     }
   }
@@ -397,7 +400,12 @@ struct BatteryHealthView: View {
         .disabled(store.isLoading)
       }
     }
-    .onAppear(perform: store.startMonitoring)
+    .onAppear {
+      Task { @MainActor in
+        await Task.yield()
+        store.startMonitoring()
+      }
+    }
     .onDisappear(perform: store.stopMonitoring)
   }
 

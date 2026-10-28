@@ -1,5 +1,6 @@
 import AppKit
 import Charts
+import CoreAudio
 import SwiftUI
 
 struct MenuBarDashboardView: View {
@@ -718,17 +719,33 @@ private struct MenuBarVolumeRow: View {
       .disabled(!isEnabled)
       .help(isMuted ? Text("Unmute") : Text("Mute"))
       .accessibilityLabel(isMuted ? Text("Unmute") : Text("Mute"))
-      Slider(
-        value: Binding(get: { volume }, set: setVolume),
-        in: 0...1,
-        onEditingChanged: onEditingChanged
+      TrackingSlider(
+        value: volume,
+        isEnabled: isEnabled,
+        controlSize: .small,
+        accessibilityLabel: "Volume",
+        deviceID: systemDeviceID,
+        hardware: systemHardware,
+        appKey: appKey,
+        appGains: appGains,
+        onEditingChanged: { isEditing, current in
+          if isEditing {
+            controller.beginVolumeDrag()
+          } else {
+            switch target {
+            case .system:
+              controller.endDeviceVolumeDrag(
+                uid: controller.output.deviceUID ?? "",
+                input: false,
+                volume: current
+              )
+            case .app(let key):
+              controller.finishAppVolumeDrag(key: key, volume: current)
+            }
+          }
+        }
       )
-      .controlSize(.small)
-      .disabled(!isEnabled)
-      Text(percent)
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(.secondary)
-        .frame(width: 36, alignment: .trailing)
+      .frame(maxWidth: .infinity)
     }
     .padding(.horizontal, MenuBarDashboardLayout.horizontalInset)
     .frame(height: MenuBarDashboardLayout.volumeRowHeight)
@@ -750,17 +767,24 @@ private struct MenuBarVolumeRow: View {
     }
   }
 
-  private var percent: String {
-    "\(Int((min(1, max(0, volume)) * 100).rounded()))%"
+  private var systemDeviceID: AudioObjectID {
+    guard case .system = target else { return 0 }
+    return controller.outputDevices.first { $0.uid == controller.output.deviceUID }?.objectID ?? 0
   }
 
-  private func setVolume(_ volume: Double) {
-    switch target {
-    case .system:
-      controller.setOutputVolume(volume)
-    case .app(let key):
-      controller.setVolume(volume, for: key)
-    }
+  private var systemHardware: HardwareVolumeRouter? {
+    guard case .system = target else { return nil }
+    return controller.hardwareVolumes
+  }
+
+  private var appKey: String? {
+    guard case .app(let key) = target else { return nil }
+    return key
+  }
+
+  private var appGains: AppGainRouter? {
+    guard case .app = target else { return nil }
+    return controller.appGains
   }
 
   private func setMuted(_ isMuted: Bool) {
@@ -769,12 +793,6 @@ private struct MenuBarVolumeRow: View {
       controller.setOutputMuted(isMuted)
     case .app(let key):
       controller.setMuted(isMuted, for: key)
-    }
-  }
-
-  private func onEditingChanged(_ isEditing: Bool) {
-    if case .system = target {
-      controller.setOutputEditing(isEditing)
     }
   }
 }

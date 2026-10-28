@@ -479,13 +479,16 @@ struct DisplayControlView: View {
       Text(localized(store.operationError ?? ""))
     }
     .onAppear {
-      if store.displays.isEmpty {
-        store.refresh()
-      }
-      if selectedDisplayID == nil {
-        selectedDisplayID = store.displays.first?.id
-        selectedModeID = store.displays.first?.currentMode?.id
-        modeFilter = .current(store.displays.first?.currentMode)
+      Task { @MainActor in
+        await Task.yield()
+        if store.displays.isEmpty {
+          store.refresh()
+        }
+        if selectedDisplayID == nil {
+          selectedDisplayID = store.displays.first?.id
+          selectedModeID = store.displays.first?.currentMode?.id
+          modeFilter = .current(store.displays.first?.currentMode)
+        }
       }
     }
     .onChange(of: store.displays) { displays in

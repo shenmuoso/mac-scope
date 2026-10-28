@@ -60,6 +60,16 @@ enum CoreAudioProperty {
     setBytes(value, selector: selector, objectID: objectID, scope: scope, element: element)
   }
 
+  static func set(
+    _ value: Float64,
+    selector: AudioObjectPropertySelector,
+    objectID: AudioObjectID,
+    scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
+    element: AudioObjectPropertyElement = kAudioObjectPropertyElementMain
+  ) -> Bool {
+    setBytes(value, selector: selector, objectID: objectID, scope: scope, element: element)
+  }
+
   private static func setBytes<T>(
     _ value: T,
     selector: AudioObjectPropertySelector,

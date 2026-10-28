@@ -60,6 +60,23 @@ struct AppAudioTests {
     )
     #expect(groups.count == 1)
     #expect(groups.first?.processes.map(\.pid) == [1, 2])
+
+    let faceTime = AudioProcessSnapshot(
+      objectID: 3,
+      pid: 3,
+      bundleID: "com.apple.avconferenced",
+      executablePath: "/usr/libexec/avconferenced"
+    )
+    let faceTimeApp = "/System/Applications/FaceTime.app"
+    if FileManager.default.fileExists(atPath: faceTimeApp) {
+      #expect(AppAudioOwningApp.groupKey(for: faceTime) == "com.apple.FaceTime")
+      #expect(AppAudioProcessName.resolve(faceTime).bundlePath == faceTimeApp)
+      #expect(AppAudioProcessName.resolve(faceTime).name != "avconferenced")
+    }
+    #expect(AppAudioMeter.visual(0) == 0)
+    #expect(AppAudioMeter.visual(1) == 1)
+    #expect(AppAudioMeter.visual(0.1) > 0.45)
+    #expect(AppAudioMeter.visual(0.1) < 0.6)
   }
 
   @Test("Processes with one bundle share a level, and this app is excluded")
@@ -173,6 +190,10 @@ struct AppAudioTests {
     #expect(tap.isRunning)
     #expect(tap.rendersSilence == false)
     #expect(tap.gain == 0.25)
+    let startsWhileDragging = tap.startCount
+    controller.setVolume(0.4, for: "com.example.player")
+    #expect(tap.startCount == startsWhileDragging)
+    #expect(tap.gain == 0.4)
     #expect(tap.processObjectIDs == [7])
     #expect(tap.outputDeviceUIDs == ["speakers"])
 
@@ -245,6 +266,125 @@ struct AppAudioTests {
     #expect(tap.rendersSilence)
   }
 
+  @Test("Dragging application volume does not rebuild the tap or publish every tick")
+  @MainActor
+  func draggingVolumeSkipsPublish() throws {
+    let suiteName = "AppAudioTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let processes = FakeAudioProcesses()
+    processes.snapshots = [
+      AudioProcessSnapshot(objectID: 7, pid: 70, bundleID: "com.example.player")
+    ]
+    let output = FakeSystemOutput()
+    let tap = FakeAppAudioTap()
+    let controller = AppAudioController(
+      defaults: defaults,
+      processes: processes,
+      outputControl: output,
+      makeTap: { _ in tap },
+      excludedPIDs: [],
+      excludedBundleIDs: []
+    )
+    controller.reconcile()
+    controller.setVolume(0.25, for: "com.example.player")
+    let starts = tap.startCount
+
+    controller.beginAppVolumeEdit()
+    controller.setInteractiveVolume(0.4, for: "com.example.player")
+    controller.setInteractiveVolume(0.55, for: "com.example.player")
+    #expect(tap.startCount == starts)
+    #expect(tap.gain == 0.55)
+    #expect(controller.apps.first?.level.volume == 0.25)
+
+    controller.endAppVolumeEdit()
+    #expect(controller.apps.first?.level.volume == 0.55)
+    let restored = AppAudioController(
+      defaults: defaults,
+      processes: processes,
+      outputControl: output,
+      makeTap: { _ in FakeAppAudioTap() },
+      excludedPIDs: [],
+      excludedBundleIDs: []
+    )
+    restored.reconcile()
+    #expect(restored.apps.first?.level.volume == 0.55)
+  }
+
+  @Test("A failed tap is not started again on every volume change")
+  @MainActor
+  func failedTapWaitsBeforeRetrying() throws {
+    let suiteName = "AppAudioTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let processes = FakeAudioProcesses()
+    processes.snapshots = [
+      AudioProcessSnapshot(objectID: 7, pid: 70, bundleID: "com.example.player")
+    ]
+    let tap = FakeAppAudioTap()
+    let controller = AppAudioController(
+      defaults: defaults,
+      processes: processes,
+      outputControl: FakeSystemOutput(),
+      makeTap: { _ in tap },
+      excludedPIDs: [],
+      excludedBundleIDs: []
+    )
+    controller.reconcile()
+    tap.startError = AppAudioTapError.unsupported
+    controller.setVolume(0.25, for: "com.example.player")
+    let attempts = tap.startCount
+    controller.setInteractiveVolume(0.4, for: "com.example.player")
+    controller.reconcile()
+    #expect(tap.startCount == attempts)
+  }
+
+  @Test("Choosing Bluetooth keeps the route when the default device has not switched yet")
+  @MainActor
+  func pendingOutputFollowsTheChosenDevice() throws {
+    let suiteName = "AppAudioTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let processes = FakeAudioProcesses()
+    processes.snapshots = [
+      AudioProcessSnapshot(objectID: 7, pid: 70, bundleID: "com.example.player")
+    ]
+    let output = FakeSystemOutput()
+    output.devices.append(
+      AudioOutputDevice(objectID: 3, uid: "display", name: "Display", transport: kAudioDeviceTransportTypeHDMI)
+    )
+    let tap = FakeAppAudioTap()
+    let controller = AppAudioController(
+      defaults: defaults,
+      processes: processes,
+      outputControl: output,
+      makeTap: { _ in tap },
+      excludedPIDs: [],
+      excludedBundleIDs: []
+    )
+    controller.reconcile()
+    controller.setVolume(0.5, for: "com.example.player")
+    #expect(tap.outputDeviceUIDs == ["speakers"])
+
+    output.appliesDefaultChange = false
+    controller.setDefaultOutputDevice("headphones")
+    #expect(controller.output.deviceUID == "headphones")
+    #expect(tap.outputDeviceUIDs == ["headphones"])
+    #expect(tap.rendersSilence == false)
+
+    controller.reconcile()
+    #expect(tap.outputDeviceUIDs == ["headphones"])
+
+    output.state.deviceUID = "display"
+    output.state.deviceName = "Display"
+    controller.reconcile()
+    #expect(controller.output.deviceUID == "display")
+    #expect(tap.outputDeviceUIDs == ["display"])
+  }
+
   @Test("The current output device and playing processes can be read")
   func readsLiveOutput() {
     let state = SystemOutputControl().read()
@@ -279,10 +419,12 @@ private final class FakeSystemOutput: SystemOutputControlling, @unchecked Sendab
     ),
   ]
 
+  var appliesDefaultChange = true
+
   func read() -> SystemOutputState { state }
   func outputDevices() -> [AudioOutputDevice] { devices }
   func setDefaultDevice(uid: String) {
-    guard let device = devices.first(where: { $0.uid == uid }) else { return }
+    guard appliesDefaultChange, let device = devices.first(where: { $0.uid == uid }) else { return }
     state.deviceUID = device.uid
     state.deviceName = device.name
   }
@@ -298,13 +440,15 @@ private final class FakeAppAudioTap: AppAudioTap, @unchecked Sendable {
   private(set) var isRunning = false
   private(set) var gain: Float = 1
   private(set) var startCount = 0
+  var startError: Error?
 
   func start(processObjectIDs: [AudioObjectID], outputDeviceUIDs: [String], rendersSilence: Bool) throws {
+    startCount += 1
+    if let startError { throw startError }
     self.processObjectIDs = processObjectIDs
     self.outputDeviceUIDs = outputDeviceUIDs
     self.rendersSilence = rendersSilence
     isRunning = true
-    startCount += 1
   }
 
   func setGain(_ gain: Float) {

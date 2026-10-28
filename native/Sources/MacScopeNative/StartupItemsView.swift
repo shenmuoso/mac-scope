@@ -111,7 +111,10 @@ struct StartupItemsView: View {
     .searchable(text: $searchText, placement: .toolbar, prompt: "Search Startup Items")
     .toolbar { toolbarContent }
     .onAppear {
-      if !store.hasScanned { store.scan() }
+      Task { @MainActor in
+        await Task.yield()
+        if !store.hasScanned { store.scan() }
+      }
     }
     .onChange(of: store.loginItems.map(\.id)) { ids in
       if let loginSelection, !ids.contains(loginSelection) {

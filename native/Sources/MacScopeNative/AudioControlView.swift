@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 import SwiftUI
 
 struct AudioControlView: View {
@@ -87,22 +88,14 @@ struct AudioControlView: View {
       muteButton(isMuted: device.isMuted, enabled: device.canChangeVolume) {
         controller.setDeviceMuted(!device.isMuted, uid: device.uid, input: input)
       }
-      Slider(
-        value: Binding(
-          get: { device.volume },
-          set: { controller.setDeviceVolume($0, uid: device.uid, input: input) }
-        ),
-        in: 0...1,
-        onEditingChanged: { isEditing in
-          controller.setDeviceEditing(isEditing ? device.uid : nil)
-        }
+      DeviceVolumeControl(
+        uid: device.uid,
+        volume: device.volume,
+        isEnabled: device.canChangeVolume,
+        name: device.name,
+        input: input,
+        deviceID: device.objectID
       )
-      .disabled(!device.canChangeVolume)
-      .accessibilityLabel(Text(verbatim: device.name))
-      Text(percentText(device.volume))
-        .monospacedDigit()
-        .frame(width: 44, alignment: .trailing)
-        .foregroundStyle(.secondary)
     }
     .padding(.vertical, 2)
   }
@@ -160,7 +153,7 @@ struct AudioControlView: View {
 
   private func applicationRow(_ row: AppAudioRow) -> some View {
     HStack(spacing: 8) {
-      levelMeter(controller.meters[row.key] ?? .silent)
+      AppAudioLevelMeter(source: controller.levelMeters, key: row.key)
       Image(nsImage: icon(for: row))
         .resizable()
         .frame(width: 32, height: 32)
@@ -176,21 +169,12 @@ struct AudioControlView: View {
       muteButton(isMuted: row.level.isMuted, enabled: true) {
         controller.setMuted(!row.level.isMuted, for: row.key)
       }
-      Slider(
-        value: Binding(
-          get: { row.level.volume },
-          set: { controller.setVolume($0, for: row.key) }
-        ),
-        in: 0...1
+      AppVolumeControl(
+        rowKey: row.key,
+        volume: row.level.volume,
+        isEnabled: row.isPlaying || AppAudioRoute.needsTap(row.level, systemDeviceUID: controller.output.deviceUID),
+        name: row.name
       )
-      .disabled(
-        !row.isPlaying && !AppAudioRoute.needsTap(row.level, systemDeviceUID: controller.output.deviceUID)
-      )
-      .accessibilityLabel(Text(verbatim: row.name))
-      Text(percentText(row.level.volume))
-        .monospacedDigit()
-        .frame(width: 44, alignment: .trailing)
-        .foregroundStyle(.secondary)
       boostMenu(for: row)
       deviceMenu(for: row)
       Button {
@@ -209,29 +193,6 @@ struct AudioControlView: View {
       .accessibilityLabel("Equalizer")
     }
     .padding(.vertical, 4)
-  }
-
-  private func levelMeter(_ meter: AppAudioMeter) -> some View {
-    HStack(spacing: 3) {
-      levelBar(meter.left)
-      levelBar(meter.right)
-    }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Level")
-  }
-
-  private func levelBar(_ level: Double) -> some View {
-    GeometryReader { proxy in
-      let amount = min(1, max(0, level))
-      ZStack(alignment: .bottom) {
-        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-          .fill(Color.primary.opacity(0.12))
-        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-          .fill(Color.accentColor)
-          .frame(height: proxy.size.height * amount)
-      }
-    }
-    .frame(width: 4, height: 28)
   }
 
   private func muteButton(isMuted: Bool, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -385,9 +346,90 @@ struct AudioControlView: View {
     }
     return NSImage(named: NSImage.applicationIconName) ?? NSImage()
   }
+}
 
-  private func percentText(_ volume: Double) -> String {
-    "\(Int((min(1, max(0, volume)) * 100).rounded()))%"
+private struct DeviceVolumeControl: View {
+  @EnvironmentObject private var controller: AppAudioController
+  let uid: String
+  let volume: Double
+  let isEnabled: Bool
+  let name: String
+  let input: Bool
+  let deviceID: AudioObjectID
+
+  var body: some View {
+    TrackingSlider(
+      value: volume,
+      isEnabled: isEnabled,
+      accessibilityLabel: name,
+      deviceID: deviceID,
+      input: input,
+      hardware: controller.hardwareVolumes,
+      onEditingChanged: { isEditing, current in
+        if isEditing {
+          controller.beginVolumeDrag()
+          controller.setDeviceEditing(uid)
+        } else {
+          controller.endDeviceVolumeDrag(uid: uid, input: input, volume: current)
+        }
+      }
+    )
+    .frame(maxWidth: .infinity)
+  }
+}
+
+private struct AppAudioLevelMeter: View {
+  @ObservedObject var source: AppAudioMeters
+  let key: String
+
+  var body: some View {
+    let meter = source.values[key] ?? .silent
+    HStack(spacing: 3) {
+      levelBar(meter.left)
+      levelBar(meter.right)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Level")
+  }
+
+  private func levelBar(_ level: Double) -> some View {
+    GeometryReader { proxy in
+      let amount = AppAudioMeter.visual(level)
+      ZStack(alignment: .bottom) {
+        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+          .fill(Color.primary.opacity(0.12))
+        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+          .fill(Color.accentColor)
+          .frame(height: proxy.size.height * amount)
+      }
+    }
+    .frame(width: 4, height: 28)
+  }
+}
+
+private struct AppVolumeControl: View {
+  @EnvironmentObject private var controller: AppAudioController
+  let rowKey: String
+  let volume: Double
+  let isEnabled: Bool
+  let name: String
+
+  var body: some View {
+    TrackingSlider(
+      value: volume,
+      isEnabled: isEnabled,
+      accessibilityLabel: name,
+      appKey: rowKey,
+      appGains: controller.appGains,
+      onEditingChanged: { isEditing, current in
+        if isEditing {
+          controller.beginVolumeDrag()
+        } else {
+          controller.finishAppVolumeDrag(key: rowKey, volume: current)
+        }
+      }
+    )
+    .frame(maxWidth: .infinity)
   }
 }
 

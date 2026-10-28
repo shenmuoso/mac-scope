@@ -9,7 +9,7 @@ enum AppAudioTapError: Error {
   case coreAudio(OSStatus)
 }
 
-protocol AppAudioTap: AnyObject {
+protocol AppAudioTap: AnyObject, Sendable {
   var processObjectIDs: [AudioObjectID] { get }
   var outputDeviceUIDs: [String] { get }
   var rendersSilence: Bool { get }
@@ -82,13 +82,14 @@ final class ProcessTapSession: AppAudioTap, @unchecked Sendable {
     }
 
     let aggregateUID = UUID().uuidString
+    // Do not set channels-out. A forced channel count makes a Bluetooth aggregate
+    // keep playing through the built-in speakers.
     let subdevices: [[String: Any]] = outputDeviceUIDs.enumerated().map { index, uid in
       var entry: [String: Any] = [
         kAudioSubDeviceUIDKey: uid,
-        kAudioSubDeviceDriftCompensationKey: (index == 0 ? 0 : 1) as NSNumber,
       ]
-      if let channels = outputChannelCount(uid: uid), channels > 0 {
-        entry[kAudioSubDeviceOutputChannelsKey] = channels as NSNumber
+      if index > 0 {
+        entry[kAudioSubDeviceDriftCompensationKey] = 1 as NSNumber
       }
       return entry
     }
@@ -98,6 +99,7 @@ final class ProcessTapSession: AppAudioTap, @unchecked Sendable {
       kAudioAggregateDeviceMainSubDeviceKey: outputDeviceUIDs[0],
       kAudioAggregateDeviceIsPrivateKey: 1 as NSNumber,
       kAudioAggregateDeviceIsStackedKey: 0 as NSNumber,
+      kAudioAggregateDeviceTapAutoStartKey: 0 as NSNumber,
       kAudioAggregateDeviceSubDeviceListKey: subdevices,
       kAudioAggregateDeviceTapListKey: [
         [
@@ -113,6 +115,7 @@ final class ProcessTapSession: AppAudioTap, @unchecked Sendable {
       AudioHardwareDestroyProcessTap(tapID)
       throw AppAudioTapError.coreAudio(aggregateStatus)
     }
+    matchSampleRate(of: aggregateID, toFirstDeviceIn: outputDeviceUIDs)
 
     guard let inputFormat = streamFormat(aggregateID, scope: kAudioObjectPropertyScopeInput),
       let outputFormat = streamFormat(aggregateID, scope: kAudioObjectPropertyScopeOutput),
@@ -170,6 +173,11 @@ final class ProcessTapSession: AppAudioTap, @unchecked Sendable {
       stop()
       throw AppAudioTapError.coreAudio(startStatus)
     }
+    let active = activeSubdeviceUIDs(aggregateID)
+    if !active.isEmpty, Set(active).isDisjoint(with: outputDeviceUIDs) {
+      stop()
+      throw AppAudioTapError.coreAudio(kAudioHardwareBadDeviceError)
+    }
   }
 
   func stop() {
@@ -202,18 +210,31 @@ final class ProcessTapSession: AppAudioTap, @unchecked Sendable {
     return description.map(AudioRenderFormat.make)
   }
 
-  private func outputChannelCount(uid: String) -> Int? {
-    let match = CoreAudioProperty.objectIDs(kAudioHardwarePropertyDevices).first { deviceID in
+  private func matchSampleRate(of aggregateID: AudioObjectID, toFirstDeviceIn uids: [String]) {
+    guard let uid = uids.first, let deviceID = deviceID(forUID: uid) else { return }
+    let rate: Float64? = CoreAudioProperty.value(
+      kAudioDevicePropertyNominalSampleRate,
+      objectID: deviceID
+    )
+    guard let rate, rate > 0 else { return }
+    _ = CoreAudioProperty.set(
+      rate,
+      selector: kAudioDevicePropertyNominalSampleRate,
+      objectID: aggregateID
+    )
+  }
+
+  private func activeSubdeviceUIDs(_ aggregateID: AudioObjectID) -> [String] {
+    CoreAudioProperty.objectIDs(
+      kAudioAggregateDevicePropertyActiveSubDeviceList,
+      objectID: aggregateID
+    ).compactMap { CoreAudioProperty.string(kAudioDevicePropertyDeviceUID, objectID: $0) }
+  }
+
+  private func deviceID(forUID uid: String) -> AudioObjectID? {
+    CoreAudioProperty.objectIDs(kAudioHardwarePropertyDevices).first { deviceID in
       CoreAudioProperty.string(kAudioDevicePropertyDeviceUID, objectID: deviceID) == uid
     }
-    guard let match else { return nil }
-    let format: AudioStreamBasicDescription? = CoreAudioProperty.value(
-      kAudioDevicePropertyStreamFormat,
-      objectID: match,
-      scope: kAudioObjectPropertyScopeOutput
-    )
-    guard let format, format.mChannelsPerFrame > 0 else { return nil }
-    return Int(format.mChannelsPerFrame)
   }
 }
 
@@ -238,7 +259,7 @@ enum AppAudioTapFactory {
   }
 }
 
-final class DisabledAppAudioTap: AppAudioTap {
+final class DisabledAppAudioTap: AppAudioTap, @unchecked Sendable {
   let processObjectIDs: [AudioObjectID] = []
   let outputDeviceUIDs: [String] = []
   let rendersSilence = false

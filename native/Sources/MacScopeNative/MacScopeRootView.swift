@@ -4,6 +4,7 @@ struct MacScopeRootView: View {
   @EnvironmentObject private var settings: AppSettings
   @EnvironmentObject private var navigation: AppNavigation
   @EnvironmentObject private var updateChecker: UpdateChecker
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private var destinationSelection: Binding<AppDestination?> {
     Binding(
@@ -11,7 +12,13 @@ struct MacScopeRootView: View {
       set: {
         let nextDestination = $0 ?? .overview
         guard navigation.destination != nextDestination else { return }
-        navigation.destination = nextDestination
+        if reduceMotion {
+          navigation.destination = nextDestination
+        } else {
+          withAnimation(.easeInOut(duration: 0.2)) {
+            navigation.destination = nextDestination
+          }
+        }
       }
     )
   }
@@ -53,6 +60,7 @@ struct MacScopeRootView: View {
       .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
     } detail: {
       detailContent
+        .pageTransition(navigation.destination)
         .navigationTitle(Text(verbatim: AppLocalization.string(
           navigation.destination.titleKey,
           language: settings.language

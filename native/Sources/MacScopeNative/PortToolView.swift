@@ -103,7 +103,12 @@ struct PortToolView: View {
         .disabled(store.isLoading)
       }
     }
-    .onAppear(perform: store.refresh)
+    .onAppear {
+      Task { @MainActor in
+        await Task.yield()
+        store.refresh()
+      }
+    }
     .alert("Force quit this process?", isPresented: $confirmsForceQuit) {
       Button("Cancel", role: .cancel) {}
       Button("Force Quit", role: .destructive) {

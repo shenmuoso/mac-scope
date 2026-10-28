@@ -188,8 +188,11 @@ struct ProcessManagementView: View {
       handleProcessInspection(navigation.processInspectionRequest)
     }
     .onAppear {
-      rebuildFilteredProcesses()
-      handleProcessInspection(navigation.processInspectionRequest)
+      Task { @MainActor in
+        await Task.yield()
+        rebuildFilteredProcesses()
+        handleProcessInspection(navigation.processInspectionRequest)
+      }
     }
     .onDisappear {
       monitor.trackProcess(nil)

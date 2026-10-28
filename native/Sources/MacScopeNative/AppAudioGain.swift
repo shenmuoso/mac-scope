@@ -74,17 +74,25 @@ enum AppAudioGain {
   ) -> (left: Float, right: Float) {
     guard format.isFloat32, format.channels > 0 else { return (0, 0) }
     let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
-    let frames = frameCount(buffers, format: format)
+    let reading = readingFormat(buffers: buffers, format: format)
+    let frames = frameCount(buffers, format: reading)
+    guard frames > 0 else { return (0, 0) }
+    let channelCount = reading.isNonInterleaved ? min(reading.channels, buffers.count) : reading.channels
+    guard channelCount > 0 else { return (0, 0) }
     var left: Float = 0
     var right: Float = 0
-    for frame in 0..<frames {
-      left = max(left, abs(read(buffers: buffers, format: format, channel: 0, frame: frame)))
-      if format.channels > 1 {
-        right = max(right, abs(read(buffers: buffers, format: format, channel: 1, frame: frame)))
+    for channel in 0..<channelCount {
+      var peak: Float = 0
+      for frame in 0..<frames {
+        peak = max(peak, abs(read(buffers: buffers, format: reading, channel: channel, frame: frame)))
+      }
+      if channel.isMultiple(of: 2) {
+        left = max(left, peak)
       } else {
-        right = left
+        right = max(right, peak)
       }
     }
+    if channelCount == 1 { right = left }
     return (left, right)
   }
 
@@ -136,6 +144,17 @@ enum AppAudioGain {
         isNonInterleaved: !interleaved
       )
     )
+  }
+
+  private static func readingFormat(
+    buffers: UnsafeMutableAudioBufferListPointer,
+    format: AudioRenderFormat
+  ) -> AudioRenderFormat {
+    guard !format.isNonInterleaved, buffers.count > 1 else { return format }
+    var copy = format
+    copy.isNonInterleaved = true
+    copy.channels = buffers.count
+    return copy
   }
 
   private static func frameCount(
