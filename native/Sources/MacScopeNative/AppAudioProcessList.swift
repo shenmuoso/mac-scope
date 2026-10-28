@@ -3,7 +3,7 @@ import CoreAudio
 import Darwin
 import Foundation
 
-protocol AppAudioProcessListing: AnyObject {
+protocol AppAudioProcessListing: AnyObject, Sendable {
   func outputProcesses() -> [AudioProcessSnapshot]
 }
 

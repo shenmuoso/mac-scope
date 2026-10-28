@@ -100,23 +100,22 @@ final class AppAudioController: ObservableObject {
 
   func start() {
     guard monitor == nil else { return }
-    refreshOutput(restartTaps: false)
     outputControl.observe { [weak self] in
       Task { @MainActor in
         guard let self, self.volumeDrags == 0 else { return }
-        self.refreshOutput(restartTaps: true)
+        await self.reloadHardware(restartTaps: true)
       }
     }
-    reconcile()
+    Task { await self.reloadHardware(restartTaps: false) }
     monitor = Task { @MainActor [weak self] in
       while !Task.isCancelled {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         guard let self, !Task.isCancelled, self.volumeDrags == 0 else { continue }
         let poll = await self.pollAudio()
         guard !Task.isCancelled, self.volumeDrags == 0 else { continue }
-        self.refreshOutput(restartTaps: false, poll: poll)
+        _ = self.applyPoll(poll)
         if !self.isEditingAppVolume {
-          self.reconcile(refreshDevices: false)
+          await self.reconcile(refreshDevices: false)
         }
       }
     }
@@ -134,7 +133,7 @@ final class AppAudioController: ObservableObject {
   }
 
   func resumeAfterWake() {
-    reconcile()
+    Task { await self.reconcile() }
   }
 
   func prepareForApplicationExit() {
@@ -179,29 +178,42 @@ final class AppAudioController: ObservableObject {
     outputControl.setMuted(isMuted)
   }
 
-  func setDefaultOutputDevice(_ uid: String) {
+  func setDefaultOutputDevice(_ uid: String) async {
     guard !uid.isEmpty else { return }
     // Bluetooth output often reports the previous device for a moment after the switch.
     // Keep the device the user chose until Core Audio catches up, and rebuild taps onto it.
-    if outputDevices.contains(where: { $0.uid == uid }) {
+    if let device = outputDevices.first(where: { $0.uid == uid }) {
       pendingOutputPreviousUID = output.deviceUID
       pendingOutputUID = uid
+      output.deviceUID = device.uid
+      output.deviceName = device.name
+      output.volume = device.volume
+      output.isMuted = device.isMuted
+      output.canChangeVolume = device.canChangeVolume
     }
     let objectID = outputDevices.first(where: { $0.uid == uid })?.objectID ?? kAudioObjectUnknown
-    outputControl.setDefaultDevice(uid: uid, objectID: objectID)
+    let control = outputControl
+    await Task.detached {
+      control.setDefaultDevice(uid: uid, objectID: objectID)
+    }.value
     retryAfter.removeAll()
-    refreshOutput(restartTaps: false)
-    reconcile()
+    await reconcile()
     // A tap aggregate on the previous device can keep that device as the audible output.
     // Set the default again after those taps have moved.
-    outputControl.setDefaultDevice(uid: uid, objectID: objectID)
-    refreshOutput(restartTaps: false)
+    await Task.detached {
+      control.setDefaultDevice(uid: uid, objectID: objectID)
+    }.value
   }
 
-  func setDefaultInputDevice(_ uid: String) {
+  func setDefaultInputDevice(_ uid: String) async {
     guard !uid.isEmpty else { return }
-    outputControl.setDefaultInputDevice(uid: uid)
-    refreshOutput(restartTaps: false)
+    let control = outputControl
+    await Task.detached {
+      control.setDefaultInputDevice(uid: uid)
+    }.value
+    let poll = await pollAudio()
+    guard volumeDrags == 0 else { return }
+    _ = applyPoll(poll)
   }
 
   func setDeviceEditing(_ uid: String?) {
@@ -245,17 +257,17 @@ final class AppAudioController: ObservableObject {
     }
   }
 
-  func setAppOutputDevices(_ uids: [String], for key: String) {
+  func setAppOutputDevices(_ uids: [String], for key: String) async {
     var level = level(for: key)
     level.outputDeviceUIDs = uids.filter { uid in outputDevices.contains { $0.uid == uid } }
     if level.outputDeviceUIDs.count < 2 {
       level.routesToMultipleDevices = false
     }
     store(level, for: key)
-    syncTap(for: key)
+    await syncTap(for: key)
   }
 
-  func setMultipleRoutes(_ enabled: Bool, for key: String) {
+  func setMultipleRoutes(_ enabled: Bool, for key: String) async {
     var level = level(for: key)
     level.routesToMultipleDevices = enabled
     if enabled && level.outputDeviceUIDs.isEmpty, let system = output.deviceUID {
@@ -265,10 +277,10 @@ final class AppAudioController: ObservableObject {
       level.outputDeviceUIDs = Array(level.outputDeviceUIDs.prefix(1))
     }
     store(level, for: key)
-    syncTap(for: key)
+    await syncTap(for: key)
   }
 
-  func toggleAppOutputDevice(_ uid: String, for key: String) {
+  func toggleAppOutputDevice(_ uid: String, for key: String) async {
     guard outputDevices.contains(where: { $0.uid == uid }) else { return }
     var level = level(for: key)
     level.routesToMultipleDevices = true
@@ -278,16 +290,16 @@ final class AppAudioController: ObservableObject {
       level.outputDeviceUIDs.append(uid)
     }
     store(level, for: key)
-    syncTap(for: key)
+    await syncTap(for: key)
   }
 
-  func setBoost(_ boost: Double, for key: String) {
+  func setBoost(_ boost: Double, for key: String) async {
     var level = level(for: key)
     level.boost = boost
-    applyLevel(level, for: key)
+    await applyLevel(level, for: key)
   }
 
-  func setEQ(_ gains: [Double], for key: String) {
+  func setEQ(_ gains: [Double], for key: String) async {
     var level = level(for: key)
     level.eqGains = gains
     store(level, for: key)
@@ -295,14 +307,14 @@ final class AppAudioController: ObservableObject {
       tap.setEQ(level.eqGains)
       tap.setGain(AppAudioRoute.gain(for: level))
     } else {
-      syncTap(for: key)
+      await syncTap(for: key)
     }
   }
 
-  func setVolume(_ volume: Double, for key: String) {
+  func setVolume(_ volume: Double, for key: String) async {
     var level = level(for: key)
     level.volume = min(1, max(0, volume))
-    applyLevel(level, for: key)
+    await applyLevel(level, for: key)
   }
 
   func beginAppVolumeEdit() {
@@ -361,7 +373,7 @@ final class AppAudioController: ObservableObject {
     releaseVolumeDragGate {
       AppAudioLevelStore.save(self.levels, to: self.defaults)
       guard generation == self.volumeEditGeneration, needs != playing else { return }
-      self.reconcile()
+      Task { await self.reconcile() }
     }
   }
 
@@ -376,7 +388,7 @@ final class AppAudioController: ObservableObject {
   }
 
   /// Slider ticks update the running tap only. Publishing the app list or saving preferences here stalls the drag.
-  func setInteractiveVolume(_ volume: Double, for key: String) {
+  func setInteractiveVolume(_ volume: Double, for key: String) async {
     isEditingAppVolume = true
     var level = level(for: key)
     level.volume = min(1, max(0, volume))
@@ -397,7 +409,7 @@ final class AppAudioController: ObservableObject {
     }
     // Starting a process tap is slow. Do it once per drag, not on every tick.
     guard volumeEnsureInFlight.insert(key).inserted else { return }
-    reconcile()
+    await reconcile(refreshDevices: false)
     volumeEnsureInFlight.remove(key)
     if let tap = taps[key], tap.isRunning, !tap.rendersSilence {
       tap.setGain(AppAudioRoute.gain(for: updated))
@@ -431,23 +443,30 @@ final class AppAudioController: ObservableObject {
     let generation = volumeEditGeneration
     Task { @MainActor in
       guard generation == self.volumeEditGeneration else { return }
-      self.reconcile()
+      await self.reconcile()
     }
   }
 
-  func setMuted(_ isMuted: Bool, for key: String) {
+  func setMuted(_ isMuted: Bool, for key: String) async {
     var level = level(for: key)
     level.isMuted = isMuted
-    applyLevel(level, for: key)
+    await applyLevel(level, for: key)
   }
 
-  func reconcile(refreshDevices: Bool = true) {
+  func reconcile(refreshDevices: Bool = true) async {
     if refreshDevices {
-      refreshOutput(restartTaps: false)
+      let poll = await pollAudio()
+      guard volumeDrags == 0 else { return }
+      _ = applyPoll(poll)
     }
     normalizeDevicePins()
+    let listing = processes
+    let snapshots = await Task.detached {
+      listing.outputProcesses()
+    }.value
+    guard volumeDrags == 0 else { return }
     let groups = AppAudioCatalog.groups(
-      processes: processes.outputProcesses(),
+      processes: snapshots,
       levels: levels,
       excludedPIDs: excludedPIDs,
       excludedBundleIDs: excludedBundleIDs
@@ -470,12 +489,14 @@ final class AppAudioController: ObservableObject {
     for row in apps where !row.processes.isEmpty {
       if AppAudioRoute.needsTap(row.level, systemDeviceUID: deviceUID) {
         playback.insert(row.key)
-        stopMeter(for: row.key)
-        switch ensureTap(
+        await stopMeter(for: row.key)
+        let playbackTap = taps[row.key] ?? makeTap(row.key)
+        taps[row.key] = playbackTap
+        switch await ensureTap(
+          tap: playbackTap,
           for: row,
           deviceUIDs: targetDeviceUIDs(for: row),
-          rendersSilence: false,
-          into: &taps
+          rendersSilence: false
         ) {
         case .running:
           break
@@ -487,12 +508,14 @@ final class AppAudioController: ObservableObject {
         }
       } else {
         metering.insert(row.key)
-        stopPlayback(for: row.key)
-        switch ensureTap(
+        await stopPlayback(for: row.key)
+        let meterTap = meterTaps[row.key] ?? makeTap(row.key)
+        meterTaps[row.key] = meterTap
+        switch await ensureTap(
+          tap: meterTap,
           for: row,
           deviceUIDs: [deviceUID],
-          rendersSilence: true,
-          into: &meterTaps
+          rendersSilence: true
         ) {
         case .running:
           break
@@ -505,10 +528,10 @@ final class AppAudioController: ObservableObject {
       }
     }
     for key in taps.keys where !playback.contains(key) {
-      stopPlayback(for: key)
+      await stopPlayback(for: key)
     }
     for key in meterTaps.keys where !metering.contains(key) {
-      stopMeter(for: key)
+      await stopMeter(for: key)
     }
     let errorKey = failed ? "MacScope could not adjust one or more application volumes." : nil
     if perAppErrorKey != errorKey { perAppErrorKey = errorKey }
@@ -518,6 +541,17 @@ final class AppAudioController: ObservableObject {
       lastTapStatus = nil
     }
     syncAppGainRouter()
+  }
+
+  private func reloadHardware(restartTaps: Bool) async {
+    let poll = await pollAudio()
+    guard volumeDrags == 0 else { return }
+    let deviceChanged = applyPoll(poll)
+    if restartTaps && deviceChanged {
+      await reconcile(refreshDevices: false)
+    } else if !restartTaps {
+      await reconcile(refreshDevices: false)
+    }
   }
 
   private struct AudioPoll: Sendable {
@@ -539,14 +573,14 @@ final class AppAudioController: ObservableObject {
     }.value
   }
 
-  private func refreshOutput(restartTaps: Bool, poll: AudioPoll? = nil) {
-    let latestDevices = preservingEdit(poll?.outputDevices ?? outputControl.outputDevices(), input: false)
+  @discardableResult
+  private func applyPoll(_ poll: AudioPoll) -> Bool {
+    let latestDevices = preservingEdit(poll.outputDevices, input: false)
     if latestDevices != outputDevices { outputDevices = latestDevices }
-    let latestInput = poll?.input ?? outputControl.readInput()
-    if latestInput != input { input = latestInput }
-    let latestInputs = preservingEdit(poll?.inputDevices ?? outputControl.inputDevices(), input: true)
+    if poll.input != input { input = poll.input }
+    let latestInputs = preservingEdit(poll.inputDevices, input: true)
     if latestInputs != inputDevices { inputDevices = latestInputs }
-    let resolved = resolvedOutput(poll?.output ?? outputControl.read())
+    let resolved = resolvedOutput(poll.output)
     let deviceChanged = resolved.deviceUID != output.deviceUID
     if isEditingOutput {
       var edited = output
@@ -557,9 +591,7 @@ final class AppAudioController: ObservableObject {
     } else if output != resolved {
       output = resolved
     }
-    if restartTaps && deviceChanged {
-      reconcile()
-    }
+    return deviceChanged
   }
 
   /// Core Audio can keep reporting the previous output for a moment after a Bluetooth switch.
@@ -633,13 +665,13 @@ final class AppAudioController: ObservableObject {
     AppAudioLevelStore.save(levels, to: defaults)
   }
 
-  private func syncTap(for _: String) {
+  private func syncTap(for _: String) async {
     retryAfter.removeAll()
-    reconcile()
+    await reconcile(refreshDevices: false)
   }
 
   /// Updates a running playback tap directly. Rebuilding the process list on every slider tick stalls the control.
-  private func applyLevel(_ level: AppAudioLevel, for key: String) {
+  private func applyLevel(_ level: AppAudioLevel, for key: String) async {
     let updated = level.clamped
     store(updated, for: key)
     if let tap = taps[key], tap.isRunning, !tap.rendersSilence,
@@ -650,7 +682,7 @@ final class AppAudioController: ObservableObject {
       syncAppGainRouter()
       return
     }
-    reconcile()
+    await reconcile(refreshDevices: false)
   }
 
   private func syncAppGainRouter() {
@@ -744,15 +776,13 @@ final class AppAudioController: ObservableObject {
   }
 
   private func ensureTap(
+    tap: any AppAudioTap,
     for row: AppAudioRow,
     deviceUIDs: [String],
-    rendersSilence: Bool,
-    into storage: inout [String: any AppAudioTap]
-  ) -> TapSync {
+    rendersSilence: Bool
+  ) async -> TapSync {
     let objectIDs = row.processes.map(\.objectID)
     let retryKey = rendersSilence ? "meter:\(row.key)" : row.key
-    let tap = storage[row.key] ?? makeTap(row.key)
-    storage[row.key] = tap
     let gain = AppAudioRoute.gain(for: row.level)
     let sameRoute = tap.outputDeviceUIDs == deviceUIDs && tap.rendersSilence == rendersSilence
       && tap.processObjectIDs == objectIDs
@@ -765,20 +795,28 @@ final class AppAudioController: ObservableObject {
     if let retry = retryAfter[retryKey], retry > Date() {
       return .waiting
     }
-    tap.stop()
-    do {
-      try tap.start(processObjectIDs: objectIDs, outputDeviceUIDs: deviceUIDs, rendersSilence: rendersSilence)
+    let started = await Task.detached {
+      tap.stop()
+      do {
+        try tap.start(processObjectIDs: objectIDs, outputDeviceUIDs: deviceUIDs, rendersSilence: rendersSilence)
+        return Result<Void, Error>.success(())
+      } catch {
+        return Result<Void, Error>.failure(error)
+      }
+    }.value
+    switch started {
+    case .success:
       tap.setGain(gain)
       tap.setEQ(row.level.eqGains)
       retryAfter[retryKey] = nil
       return .running
-    } catch let error as AppAudioTapError {
+    case .failure(let error as AppAudioTapError):
       retryAfter[retryKey] = Date().addingTimeInterval(5)
       if case .coreAudio(let status) = error {
         return .failed(status)
       }
       return .failed(0)
-    } catch {
+    case .failure:
       retryAfter[retryKey] = Date().addingTimeInterval(5)
       return .failed(0)
     }
@@ -799,16 +837,20 @@ final class AppAudioController: ObservableObject {
     levelMeters.update(next)
   }
 
-  private func stopPlayback(for key: String) {
-    taps[key]?.stop()
-    taps[key] = nil
+  private func stopPlayback(for key: String) async {
+    let tap = taps.removeValue(forKey: key)
     retryAfter[key] = nil
+    if let tap {
+      await Task.detached { tap.stop() }.value
+    }
   }
 
-  private func stopMeter(for key: String) {
-    meterTaps[key]?.stop()
-    meterTaps[key] = nil
+  private func stopMeter(for key: String) async {
+    let tap = meterTaps.removeValue(forKey: key)
     retryAfter["meter:\(key)"] = nil
+    if let tap {
+      await Task.detached { tap.stop() }.value
+    }
   }
 
   private func row(for group: AppAudioGroup) -> AppAudioRow {

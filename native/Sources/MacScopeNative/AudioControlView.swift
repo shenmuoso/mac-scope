@@ -60,10 +60,12 @@ struct AudioControlView: View {
   private func deviceRow(_ device: AudioOutputDevice, isDefault: Bool, input: Bool) -> some View {
     HStack(spacing: 10) {
       Button {
-        if input {
-          controller.setDefaultInputDevice(device.uid)
-        } else {
-          controller.setDefaultOutputDevice(device.uid)
+        Task {
+          if input {
+            await controller.setDefaultInputDevice(device.uid)
+          } else {
+            await controller.setDefaultOutputDevice(device.uid)
+          }
         }
       } label: {
         HStack(spacing: 8) {
@@ -117,7 +119,7 @@ struct AudioControlView: View {
               applicationRow(row)
               if equalizerKey == row.key {
                 AppAudioEqualizerView(gains: row.level.eqGains) { gains in
-                  controller.setEQ(gains, for: row.key)
+                  Task { await controller.setEQ(gains, for: row.key) }
                 }
               }
             }
@@ -167,7 +169,7 @@ struct AudioControlView: View {
       }
       .frame(width: 156, alignment: .leading)
       muteButton(isMuted: row.level.isMuted, enabled: true) {
-        controller.setMuted(!row.level.isMuted, for: row.key)
+        Task { await controller.setMuted(!row.level.isMuted, for: row.key) }
       }
       AppVolumeControl(
         rowKey: row.key,
@@ -211,7 +213,7 @@ struct AudioControlView: View {
     Menu {
       ForEach([1.0, 2.0, 3.0, 4.0], id: \.self) { factor in
         Button {
-          controller.setBoost(factor, for: row.key)
+          Task { await controller.setBoost(factor, for: row.key) }
         } label: {
           deviceChoice(Text(verbatim: "\(Int(factor))×"), selected: row.level.boost == factor)
         }
@@ -231,12 +233,12 @@ struct AudioControlView: View {
     let multiple = row.level.routesToMultipleDevices
     return Menu {
       Button {
-        controller.setMultipleRoutes(false, for: row.key)
+        Task { await controller.setMultipleRoutes(false, for: row.key) }
       } label: {
         deviceChoice(Text("Single"), selected: !multiple)
       }
       Button {
-        controller.setMultipleRoutes(true, for: row.key)
+        Task { await controller.setMultipleRoutes(true, for: row.key) }
       } label: {
         deviceChoice(Text("Multi"), selected: multiple)
       }
@@ -253,7 +255,7 @@ struct AudioControlView: View {
         .disabled(true)
       } else {
         Button {
-          controller.setAppOutputDevices([], for: row.key)
+          Task { await controller.setAppOutputDevices([], for: row.key) }
         } label: {
           deviceChoice(Text("Follow System"), selected: row.level.outputDeviceUIDs.isEmpty)
         }
@@ -261,9 +263,9 @@ struct AudioControlView: View {
       ForEach(controller.outputDevices) { device in
         Button {
           if multiple {
-            controller.toggleAppOutputDevice(device.uid, for: row.key)
+            Task { await controller.toggleAppOutputDevice(device.uid, for: row.key) }
           } else {
-            controller.setAppOutputDevices([device.uid], for: row.key)
+            Task { await controller.setAppOutputDevices([device.uid], for: row.key) }
           }
         } label: {
           HStack {

@@ -161,7 +161,7 @@ struct AppAudioTests {
 
   @Test("Only a changed application starts a tap, and full volume removes it")
   @MainActor
-  func controllerStartsAndStopsTaps() throws {
+  func controllerStartsAndStopsTaps() async throws {
     let suiteName = "AppAudioTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -181,33 +181,33 @@ struct AppAudioTests {
       excludedBundleIDs: []
     )
 
-    controller.reconcile()
+    await controller.reconcile()
     #expect(tap.isRunning)
     #expect(tap.rendersSilence)
     #expect(tap.outputDeviceUIDs == ["speakers"])
 
-    controller.setVolume(0.25, for: "com.example.player")
+    await controller.setVolume(0.25, for: "com.example.player")
     #expect(tap.isRunning)
     #expect(tap.rendersSilence == false)
     #expect(tap.gain == 0.25)
     let startsWhileDragging = tap.startCount
-    controller.setVolume(0.4, for: "com.example.player")
+    await controller.setVolume(0.4, for: "com.example.player")
     #expect(tap.startCount == startsWhileDragging)
     #expect(tap.gain == 0.4)
     #expect(tap.processObjectIDs == [7])
     #expect(tap.outputDeviceUIDs == ["speakers"])
 
-    controller.setMuted(true, for: "com.example.player")
+    await controller.setMuted(true, for: "com.example.player")
     #expect(tap.gain == 0)
     #expect(tap.isRunning)
 
     output.state.deviceUID = "headphones"
-    controller.reconcile()
+    await controller.reconcile()
     #expect(tap.startCount == 3)
     #expect(tap.outputDeviceUIDs == ["headphones"])
 
-    controller.setMuted(false, for: "com.example.player")
-    controller.setVolume(1, for: "com.example.player")
+    await controller.setMuted(false, for: "com.example.player")
+    await controller.setVolume(1, for: "com.example.player")
     #expect(tap.isRunning)
     #expect(tap.rendersSilence)
 
@@ -219,13 +219,13 @@ struct AppAudioTests {
       excludedPIDs: [],
       excludedBundleIDs: []
     )
-    restored.reconcile()
+    await restored.reconcile()
     #expect(restored.apps.first { $0.key == "com.example.player" }?.level.volume == 1)
   }
 
   @Test("A chosen output device stays when the system default changes")
   @MainActor
-  func routesAnAppToItsOwnDevice() throws {
+  func routesAnAppToItsOwnDevice() async throws {
     let suiteName = "AppAudioTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -245,30 +245,30 @@ struct AppAudioTests {
       excludedBundleIDs: []
     )
 
-    controller.reconcile()
-    controller.setAppOutputDevices(["headphones"], for: "com.example.player")
+    await controller.reconcile()
+    await controller.setAppOutputDevices(["headphones"], for: "com.example.player")
     #expect(tap.isRunning)
     #expect(tap.rendersSilence == false)
     #expect(tap.outputDeviceUIDs == ["headphones"])
     #expect(tap.gain == 1)
 
     output.state.deviceUID = "other"
-    controller.reconcile()
+    await controller.reconcile()
     #expect(tap.outputDeviceUIDs == ["headphones"])
     #expect(tap.startCount == 2)
 
-    controller.setMultipleRoutes(true, for: "com.example.player")
-    controller.toggleAppOutputDevice("speakers", for: "com.example.player")
+    await controller.setMultipleRoutes(true, for: "com.example.player")
+    await controller.toggleAppOutputDevice("speakers", for: "com.example.player")
     #expect(tap.outputDeviceUIDs == ["headphones", "speakers"])
 
-    controller.setAppOutputDevices([], for: "com.example.player")
+    await controller.setAppOutputDevices([], for: "com.example.player")
     #expect(tap.isRunning)
     #expect(tap.rendersSilence)
   }
 
   @Test("Dragging application volume does not rebuild the tap or publish every tick")
   @MainActor
-  func draggingVolumeSkipsPublish() throws {
+  func draggingVolumeSkipsPublish() async throws {
     let suiteName = "AppAudioTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -287,13 +287,13 @@ struct AppAudioTests {
       excludedPIDs: [],
       excludedBundleIDs: []
     )
-    controller.reconcile()
-    controller.setVolume(0.25, for: "com.example.player")
+    await controller.reconcile()
+    await controller.setVolume(0.25, for: "com.example.player")
     let starts = tap.startCount
 
     controller.beginAppVolumeEdit()
-    controller.setInteractiveVolume(0.4, for: "com.example.player")
-    controller.setInteractiveVolume(0.55, for: "com.example.player")
+    await controller.setInteractiveVolume(0.4, for: "com.example.player")
+    await controller.setInteractiveVolume(0.55, for: "com.example.player")
     #expect(tap.startCount == starts)
     #expect(tap.gain == 0.55)
     #expect(controller.apps.first?.level.volume == 0.25)
@@ -308,13 +308,13 @@ struct AppAudioTests {
       excludedPIDs: [],
       excludedBundleIDs: []
     )
-    restored.reconcile()
+    await restored.reconcile()
     #expect(restored.apps.first?.level.volume == 0.55)
   }
 
   @Test("A failed tap is not started again on every volume change")
   @MainActor
-  func failedTapWaitsBeforeRetrying() throws {
+  func failedTapWaitsBeforeRetrying() async throws {
     let suiteName = "AppAudioTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -332,18 +332,18 @@ struct AppAudioTests {
       excludedPIDs: [],
       excludedBundleIDs: []
     )
-    controller.reconcile()
+    await controller.reconcile()
     tap.startError = AppAudioTapError.unsupported
-    controller.setVolume(0.25, for: "com.example.player")
+    await controller.setVolume(0.25, for: "com.example.player")
     let attempts = tap.startCount
-    controller.setInteractiveVolume(0.4, for: "com.example.player")
-    controller.reconcile()
+    await controller.setInteractiveVolume(0.4, for: "com.example.player")
+    await controller.reconcile()
     #expect(tap.startCount == attempts)
   }
 
   @Test("Choosing Bluetooth keeps the route when the default device has not switched yet")
   @MainActor
-  func pendingOutputFollowsTheChosenDevice() throws {
+  func pendingOutputFollowsTheChosenDevice() async throws {
     let suiteName = "AppAudioTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -365,22 +365,22 @@ struct AppAudioTests {
       excludedPIDs: [],
       excludedBundleIDs: []
     )
-    controller.reconcile()
-    controller.setVolume(0.5, for: "com.example.player")
+    await controller.reconcile()
+    await controller.setVolume(0.5, for: "com.example.player")
     #expect(tap.outputDeviceUIDs == ["speakers"])
 
     output.appliesDefaultChange = false
-    controller.setDefaultOutputDevice("headphones")
+    await controller.setDefaultOutputDevice("headphones")
     #expect(controller.output.deviceUID == "headphones")
     #expect(tap.outputDeviceUIDs == ["headphones"])
     #expect(tap.rendersSilence == false)
 
-    controller.reconcile()
+    await controller.reconcile()
     #expect(tap.outputDeviceUIDs == ["headphones"])
 
     output.state.deviceUID = "display"
     output.state.deviceName = "Display"
-    controller.reconcile()
+    await controller.reconcile()
     #expect(controller.output.deviceUID == "display")
     #expect(tap.outputDeviceUIDs == ["display"])
   }

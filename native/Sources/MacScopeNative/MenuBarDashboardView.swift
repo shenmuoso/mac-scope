@@ -792,7 +792,7 @@ private struct MenuBarVolumeRow: View {
     case .system:
       controller.setOutputMuted(isMuted)
     case .app(let key):
-      controller.setMuted(isMuted, for: key)
+      Task { await controller.setMuted(isMuted, for: key) }
     }
   }
 }
